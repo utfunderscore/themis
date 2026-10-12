@@ -1,0 +1,25 @@
+[project]
+name = "distill-jev"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Connor", email = "83981186+utfunderscore@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "modal>=1.0,<2",
+    "polars>=2.0.0",
+]
+
+[project.scripts]
+distill-jev = "distill_jev:main"
+
+[build-system]
+requires = ["uv_build>=0.12.22,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.40.2",
+]
