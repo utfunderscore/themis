@@ -1,7 +1,6 @@
 """Length-aware scheduling around the unchanged native DecisionModel predictor."""
 
 from importlib import import_module
-from time import perf_counter
 from typing import Any
 
 MAX_INPUT_TOKENS = 8192
@@ -30,12 +29,10 @@ def rendered_input_lengths(model: Any, rows: list[dict[str, Any]]) -> list[int]:
 def plan_batches(lengths: list[int], batch_size: int, *, length_sorted: bool = True,
                  max_padded_tokens: int = DEFAULT_PADDED_TOKEN_BUDGET) -> list[list[int]]:
     """Stable length sorting with an activation-memory proxy, not a VRAM guarantee."""
-    if type(batch_size) is not int or not 1 <= batch_size <= MAX_BATCH_SIZE:
+    if not 1 <= batch_size <= MAX_BATCH_SIZE:
         raise ValueError(f"batch_size must be an integer between 1 and {MAX_BATCH_SIZE}")
-    if type(max_padded_tokens) is not int or max_padded_tokens < MAX_INPUT_TOKENS:
+    if max_padded_tokens < MAX_INPUT_TOKENS:
         raise ValueError("max_padded_tokens must allow one complete 8192-token input")
-    if any(type(length) is not int or not 1 <= length <= MAX_INPUT_TOKENS for length in lengths):
-        raise ValueError("Full input lengths must be integers between 1 and 8192")
     order = sorted(range(len(lengths)), key=lengths.__getitem__) if length_sorted else list(range(len(lengths)))
     batches, current = [], []
     longest = 0
@@ -60,7 +57,6 @@ def predict_indexed_batch(model: Any, rows: list[dict[str, Any]], indices: list[
     prediction's traceback no longer retains its tensors. Singleton OOMs remain
     fatal to the configuration, rather than silently dropping an input.
     """
-    started = perf_counter()
     try:
         scores = model.predict([rows[index] for index in indices], batch_size=len(indices))
         torch.cuda.synchronize()
@@ -70,7 +66,6 @@ def predict_indexed_batch(model: Any, rows: list[dict[str, Any]], indices: list[
         failure = {"indices": list(indices), "batch_size": len(indices), "error": str(exc)}
     else:
         stats["successful_batch_sizes"].append(len(indices))
-        stats["batch_latencies_seconds"].append(perf_counter() - started)
         return list(zip(indices, scores, strict=True))
     stats["oom_splits"].append(failure)
     torch.cuda.empty_cache()
@@ -96,7 +91,7 @@ def predict_length_batched(model: Any, rows: list[dict[str, Any]],
     torch = import_module("torch")
     stats: dict[str, Any] = {
         "full_input_lengths": lengths, "successful_batch_sizes": [],
-        "batch_latencies_seconds": [], "oom_splits": [], "runtime_batch_cap": batch_size,
+        "oom_splits": [], "runtime_batch_cap": batch_size,
     }
     results: list[list[float] | None] = [None] * len(rows)
     for indices in batches:

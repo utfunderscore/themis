@@ -3,13 +3,19 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import os
 from threading import Event, Thread
-from time import perf_counter
+from time import perf_counter, time
+
+RUN_STARTED_AT_ENV = "DISTILL_JEV_RUN_STARTED_AT"
 
 
-def log(message: str) -> None:
+def log(message: str, *, started_at: float | None = None) -> None:
     timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    print(f"[{timestamp}] {message}", flush=True)
+    if started_at is None and RUN_STARTED_AT_ENV in os.environ:
+        started_at = float(os.environ[RUN_STARTED_AT_ENV])
+    elapsed = f" [run elapsed={max(0, time() - started_at):.1f}s]" if started_at is not None else ""
+    print(f"[{timestamp}]{elapsed} {message}", flush=True)
 
 
 @contextmanager
@@ -20,7 +26,7 @@ def stage(name: str) -> Iterator[None]:
 
     def heartbeat() -> None:
         while not done.wait(15):
-            log(f"{name}: still running; elapsed={perf_counter() - started:.1f}s")
+            log(f"{name}: still running")
 
     log(f"{name}: starting")
     thread = Thread(target=heartbeat, daemon=True)
@@ -31,17 +37,9 @@ def stage(name: str) -> Iterator[None]:
         done.set()
         thread.join()
         log(f"{name}: interrupted/failed ({type(exc).__name__}); "
-            f"elapsed={perf_counter() - started:.1f}s")
+            f"stage duration={perf_counter() - started:.1f}s")
         raise
     else:
         done.set()
         thread.join()
-        log(f"{name}: complete; elapsed={perf_counter() - started:.1f}s")
-
-
-def log_count(name: str, completed: int, total: int, started: float) -> None:
-    elapsed = perf_counter() - started
-    rate = completed / elapsed if elapsed > 0 else 0
-    eta = (total - completed) / rate if rate > 0 else 0
-    log(f"{name}: {completed}/{total} ({completed / total:.0%}); "
-        f"elapsed={elapsed:.1f}s; rate={rate:.2f} rows/s; ETA={eta:.1f}s")
+        log(f"{name}: complete; stage duration={perf_counter() - started:.1f}s")

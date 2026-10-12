@@ -12,6 +12,45 @@ from distill_jev.pipeline import pipeline
 
 
 class CombinedPipelineTests(unittest.TestCase):
+    def setUp(self):
+        # Pipeline tests must never start paid Perplexity inference.
+        patcher = patch("distill_jev.pipeline.predict_dataset")
+        self.predict = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_pipeline_scores_sample_and_reuses_completed_predictions(self):
+        from distill_jev.models.decision.perplexity.questions import CATEGORY_QUESTION
+
+        with TemporaryDirectory() as directory, chdir(directory):
+            source = Path("cache/combined_chats_moderated.jsonl")
+            source.parent.mkdir()
+            source.touch()
+            destination = Path("cache/combined_chats_inference_sample_100k_decisions.jsonl")
+            with patch("distill_jev.pipeline.guided_sample_dataset"):
+                pipeline()
+                self.predict.assert_called_once_with(
+                    Path("cache/combined_chats_inference_sample_100k.jsonl"), destination,
+                    question=CATEGORY_QUESTION, batch_size=32, rows_per_shard=1024,
+                    max_containers=4,
+                )
+                destination.write_text("completed output")
+                self.predict.reset_mock()
+                pipeline()
+                self.predict.assert_not_called()
+                self.assertEqual(destination.read_text(), "completed output")
+
+    def test_inference_failure_does_not_report_completion(self):
+        with TemporaryDirectory() as directory, chdir(directory):
+            source = Path("cache/combined_chats_moderated.jsonl")
+            source.parent.mkdir()
+            source.touch()
+            self.predict.side_effect = RuntimeError("inference failed")
+            with (patch("distill_jev.pipeline.guided_sample_dataset"),
+                  patch("builtins.print") as output):
+                with self.assertRaisesRegex(RuntimeError, "inference failed"):
+                    pipeline()
+                self.assertFalse(any(call.args == ("Pipeline complete.",) for call in output.call_args_list))
+
     def test_deduplicates_lazy_frame(self) -> None:
         chats = pl.DataFrame({"content": ["hello", "hello", "Hello", ""]}).lazy()
         with TemporaryDirectory() as directory:

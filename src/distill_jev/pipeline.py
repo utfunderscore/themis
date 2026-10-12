@@ -8,13 +8,16 @@ from distill_jev.datasets.download_minecraft_server_chat import (
     download as download_minecraft_chats,
 )
 from distill_jev.datasets.sampling import guided_sample_dataset
+from distill_jev.models.decision.perplexity.bulk import predict_dataset
+from distill_jev.models.decision.perplexity.questions import CATEGORY_QUESTION
 from distill_jev.models.koala.moderation import moderate_dataset
 
 def pipeline() -> None:
-    """Deduplicate, reuse/resume Koala moderation, then build the guided 100k sample."""
+    """Moderate, sample 100k chats, then reuse/resume Perplexity inference."""
     deduplicated = Path("cache/combined_chats_deduplicated.jsonl")
     koala_predictions = Path("cache/combined_chats_moderated.jsonl")
     sample = Path("cache/combined_chats_inference_sample_100k.jsonl")
+    decisions = Path("cache/combined_chats_inference_sample_100k_decisions.jsonl")
 
     # Moderation publishes this file only after all result shards are downloaded.
     if koala_predictions.is_file():
@@ -36,6 +39,13 @@ def pipeline() -> None:
          "SH": 7_000, "HR": 5_088, "H2": 1},
         seed=42,
     )
+    if decisions.is_file():
+        print(f"Reusing completed results: {decisions}", flush=True)
+    else:
+        _ = predict_dataset(
+            sample, decisions, question=CATEGORY_QUESTION,
+            batch_size=32, rows_per_shard=1024, max_containers=4,
+        )
     print("Pipeline complete.", flush=True)
 
 
