@@ -12,6 +12,37 @@ dependencies = [
     "polars>=2.0.0",
 ]
 
+[project.optional-dependencies]
+training = [
+    "numpy>=2,<3",
+    "torch==2.8.0",
+    "transformers==4.57.1",
+    "accelerate>=1.10,<2",
+    "sentencepiece>=0.2,<0.3",
+    "protobuf>=5,<8",
+]
+cpu = ["torch==2.8.0"]
+cuda = ["torch==2.8.0"]
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu128", extra = "cuda" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
 [project.scripts]
 distill-jev = "distill_jev:main"
 
