@@ -2,6 +2,8 @@
 
 Dataset preparation and moderation inference. See [DeBERTa training](docs/deberta-training.md) for CPU and CUDA training instructions.
 
+The [Java inference project](java/README.md) provides a Java 21 Gradle scaffold for ONNX inference.
+
 After category inference, the pipeline prepares
 `cache/combined_chats_inference_sample_100k_review_inputs.jsonl` and runs a second
 Perplexity pass, saving results to
