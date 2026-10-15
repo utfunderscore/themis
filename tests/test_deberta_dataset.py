@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 import polars as pl
 
-from distill_jev.models.deberta import LABELS, prepare_dataset
+from distill_jev.models.deberta import ACTION_LABELS, LABELS, prepare_dataset
 
 
 class DebertaDatasetTests(unittest.TestCase):
@@ -19,6 +19,9 @@ class DebertaDatasetTests(unittest.TestCase):
                              "decision": {"answer": {"probabilities": dict(reversed(list(zip(LABELS, probabilities))))}}})
         rows[1]["content"] = "MESSAGE 0 #0 🌍!?  "
         rows.append({**rows[0], "content": "   "})
+        rows = [{"state": row["content"], "source": row,
+                 "decision": {"answer": {"probabilities": dict(zip(ACTION_LABELS, [0.2, 0.8]))}}}
+                for row in rows]
         with TemporaryDirectory() as temp:
             root = Path(temp)
             source = root / "input.jsonl"
@@ -31,12 +34,15 @@ class DebertaDatasetTests(unittest.TestCase):
             frames = [pl.read_parquet(path) for path in split_paths.values()]
             self.assertEqual(sum(frame.height for frame in frames), 120)
             combined = pl.concat(frames).sort("content")
-            self.assertEqual(combined["content"].to_list(), sorted(row["content"] for row in rows[:-1]))
+            self.assertEqual(combined["content"].to_list(), sorted(row["state"] for row in rows[:-1]))
             groups = [{" ".join(text.casefold().split()) for text in frame["content"]} for frame in frames]
             for a, b in ((0, 1), (0, 2), (1, 2)):
                 self.assertFalse(groups[a] & groups[b])
             for frame in frames:
-                self.assertEqual(frame.columns, ["content", "targets", "teacher_argmax"])
+                self.assertEqual(frame.columns, ["content", "targets", "teacher_argmax",
+                                                 "action_targets", "action_teacher_argmax"])
+                self.assertEqual(frame.schema["action_targets"], pl.Array(pl.Float32, 2))
+                self.assertEqual(set(frame["action_teacher_argmax"]), {1})
                 self.assertEqual(frame.schema["targets"], pl.Array(pl.Float32, 6))
                 self.assertEqual(set(frame["teacher_argmax"]), set(range(6)))
                 for row in frame.iter_rows(named=True):

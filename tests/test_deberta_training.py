@@ -1,8 +1,10 @@
 import importlib.util
 import json
 import unittest
+from contextlib import chdir
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import polars as pl
 
@@ -14,17 +16,53 @@ if HAS_TRAINING:
     import torch
     from transformers import BertTokenizerFast, DebertaV2Config, DebertaV2ForSequenceClassification
 
-    from distill_jev.models.deberta import LABELS
+    from distill_jev.models.deberta import ACTION_LABELS, LABELS
     from distill_jev.models.deberta.training import (
         SoftTargetDataset,
         TrainingConfig,
         soft_target_loss,
+        multitask_loss,
         train,
     )
 
 
 @unittest.skipUnless(HAS_TRAINING, "Install the training extra to run trainer tests")
 class DebertaTrainingTests(unittest.TestCase):
+    def test_pipeline_training_prepares_reuses_and_preserves_outputs(self):
+        from distill_jev.pipeline import train_student
+
+        with TemporaryDirectory() as temp, chdir(temp):
+            source = Path("reviews.jsonl")
+            splits = Path("cache/deberta/review-splits")
+            receipt = Path("cache/deberta/review-modal-run.json")
+            with (patch("distill_jev.pipeline.prepare_training_dataset") as prepare,
+                  patch("distill_jev.models.deberta.modal_training.train", return_value={"run_id": "test"}) as training):
+                splits.parent.mkdir(parents=True)
+                train_student(source)
+                prepare.assert_called_once_with(source, splits)
+                training.assert_called_once_with(splits)
+                self.assertEqual(json.loads(receipt.read_text()), {"run_id": "test"})
+                receipt.unlink()
+                splits.mkdir()
+                for split in ("train", "validation", "test"):
+                    (splits / f"{split}.parquet").touch()
+                prepare.reset_mock()
+                train_student(source)
+                prepare.assert_not_called()
+                self.assertEqual(training.call_count, 2)
+                training.reset_mock()
+                train_student(source)
+                training.assert_not_called()
+
+    def test_tasks_have_independent_normalization_and_gradients(self):
+        logits = torch.zeros((1, 8), requires_grad=True)
+        targets = torch.tensor([[1., 0, 0, 0, 0, 0, 0.25, 0.75]])
+        loss = multitask_loss(logits, targets)
+        self.assertAlmostEqual(loss.item(), np.log(6) + np.log(2), places=6)
+        loss.backward()
+        torch.testing.assert_close(logits.grad[:, :6], torch.full((1, 6), 1 / 6) - targets[:, :6])
+        torch.testing.assert_close(logits.grad[:, 6:], torch.tensor([[0.25, -0.25]]))
+
     def test_soft_targets_preserve_distribution_and_gradients(self):
         logits = torch.zeros((2, 6), requires_grad=True)
         targets = torch.tensor([[0.7, 0.3, 0, 0, 0, 0], [0, 0, 0, 0, 0.2, 0.8]])
@@ -55,7 +93,7 @@ class DebertaTrainingTests(unittest.TestCase):
             tokenizer.save_pretrained(base)
             model = DebertaV2ForSequenceClassification(DebertaV2Config(
                 vocab_size=7, hidden_size=16, num_hidden_layers=1, num_attention_heads=2,
-                intermediate_size=24, max_position_embeddings=32, num_labels=6,
+                intermediate_size=24, max_position_embeddings=32, num_labels=8,
                 relative_attention=False, pad_token_id=0,
             ))
             model.save_pretrained(base)
@@ -66,6 +104,8 @@ class DebertaTrainingTests(unittest.TestCase):
                     "content": ["hello", "hello world", "world", "world hello"],
                     "targets": [[0.7, 0.1, 0.05, 0.05, 0.05, 0.05]] * 4,
                     "teacher_argmax": [0] * 4,
+                    "action_targets": [[0.25, 0.75]] * 4,
+                    "action_teacher_argmax": [1] * 4,
                 }).write_parquet(splits / f"{split}.parquet")
             output = root / "run"
             result = train(splits, output, config=TrainingConfig(
@@ -75,11 +115,12 @@ class DebertaTrainingTests(unittest.TestCase):
             ))
             metrics = json.loads((output / "metrics.json").read_text())
             self.assertTrue(np.isfinite(metrics["test"]["test_loss"]))
-            self.assertIn("validation_teacher_kl", metrics["validation"])
+            self.assertIn("validation_category_teacher_kl", metrics["validation"])
+            self.assertIn("validation_action_teacher_kl", metrics["validation"])
             self.assertTrue(Path(metrics["best_checkpoint"]).is_dir())
             saved = DebertaV2ForSequenceClassification.from_pretrained(result["model_directory"])
             best = DebertaV2ForSequenceClassification.from_pretrained(metrics["best_checkpoint"])
-            self.assertEqual(tuple(saved.config.id2label.values()), LABELS)
+            self.assertEqual(tuple(saved.config.id2label.values()), LABELS + ACTION_LABELS)
             for key, value in saved.state_dict().items():
                 torch.testing.assert_close(value, best.state_dict()[key])
             self.assertTrue(any(not torch.equal(value, model.state_dict()[key])

@@ -1,4 +1,4 @@
-"""Fine-tune a six-class DeBERTa student. Requires the ``training`` extra."""
+"""Distill category and moderation action. Requires the ``training`` extra."""
 
 import json
 from dataclasses import asdict, dataclass
@@ -18,7 +18,7 @@ from transformers import (
     set_seed,
 )
 
-from .dataset import LABELS
+from .dataset import ACTION_LABELS, LABELS
 
 
 @dataclass(frozen=True)
@@ -79,7 +79,18 @@ class SoftTargetDataset(Dataset):
             raise ValueError(f"{path}: targets must be finite, nonnegative probability distributions")
         if not np.array_equal(targets.argmax(axis=1), frame["teacher_argmax"].to_numpy()):
             raise ValueError(f"{path}: teacher_argmax disagrees with targets")
-        self.targets = targets
+        actions = pl.read_parquet(path, columns=["action_targets", "action_teacher_argmax"])
+        try:
+            action_targets = np.asarray(actions["action_targets"].to_list(), dtype=np.float32)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{path}: invalid action targets") from exc
+        if (action_targets.shape != (len(texts), len(ACTION_LABELS))
+                or not np.isfinite(action_targets).all() or (action_targets < 0).any()
+                or not np.allclose(action_targets.sum(axis=1), 1.0, atol=1e-5, rtol=0)):
+            raise ValueError(f"{path}: action targets must be probability distributions")
+        if not np.array_equal(action_targets.argmax(axis=1), actions["action_teacher_argmax"].to_numpy()):
+            raise ValueError(f"{path}: action_teacher_argmax disagrees with targets")
+        self.targets = np.concatenate((targets, action_targets), axis=1)
         self.encodings = {}
         for start in range(0, len(texts), 1024):
             batch = tokenizer(texts[start:start + 1024], truncation=True, max_length=max_length)
@@ -113,11 +124,30 @@ class SoftTargetTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         targets = inputs["labels"]
         outputs = model(**{key: value for key, value in inputs.items() if key != "labels"})
-        loss = soft_target_loss(outputs.logits, targets)
+        loss = multitask_loss(outputs.logits, targets)
         return (loss, outputs) if return_outputs else loss
 
 
+def multitask_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """Equal-weight sum of independently normalized category and action losses."""
+    boundary = len(LABELS)
+    return (soft_target_loss(logits[..., :boundary], targets[..., :boundary])
+            + soft_target_loss(logits[..., boundary:], targets[..., boundary:]))
+
+
 def compute_metrics(prediction: EvalPrediction) -> dict[str, float]:
+    metrics = {}
+    for name, start, stop, labels in (
+        ("category", 0, len(LABELS), LABELS),
+        ("action", len(LABELS), len(LABELS) + len(ACTION_LABELS), ACTION_LABELS),
+    ):
+        task = EvalPrediction(predictions=prediction.predictions[:, start:stop],
+                              label_ids=prediction.label_ids[:, start:stop])
+        metrics.update({f"{name}_{key}": value for key, value in _task_metrics(task, labels).items()})
+    return metrics
+
+
+def _task_metrics(prediction: EvalPrediction, labels: tuple[str, ...]) -> dict[str, float]:
     """Agreement metrics measure fidelity to the teacher, not human accuracy."""
     logits = np.asarray(prediction.predictions, dtype=np.float64)
     targets = np.asarray(prediction.label_ids, dtype=np.float64)
@@ -127,7 +157,7 @@ def compute_metrics(prediction: EvalPrediction) -> dict[str, float]:
     expected = targets.argmax(axis=1)
     metrics = {"teacher_agreement": float(np.mean(predicted == expected))}
     f1_scores = []
-    for index, label in enumerate(LABELS):
+    for index, label in enumerate(labels):
         true_positive = np.sum((predicted == index) & (expected == index))
         denominator = np.sum(predicted == index) + np.sum(expected == index)
         f1 = float(2 * true_positive / denominator) if denominator else 0.0
@@ -159,18 +189,24 @@ def train(
         if not (source / f"{split}.parquet").is_file():
             raise FileNotFoundError(source / f"{split}.parquet")
     set_seed(config.seed)
-    tokenizer = AutoTokenizer.from_pretrained(config.model_name, revision=config.revision)
+    # Preserve SentencePiece byte fallback for unusual chat characters.
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.model_name, revision=config.revision, use_fast=False,
+    )
     datasets = {split: SoftTargetDataset(source / f"{split}.parquet", tokenizer, config.max_length)
                 for split in ("train", "validation", "test")}
     model = AutoModelForSequenceClassification.from_pretrained(
-        config.model_name, revision=config.revision, num_labels=len(LABELS),
-        id2label=dict(enumerate(LABELS)), label2id={label: i for i, label in enumerate(LABELS)},
+        config.model_name, revision=config.revision, num_labels=len(LABELS) + len(ACTION_LABELS),
+        id2label=dict(enumerate(LABELS + ACTION_LABELS)),
+        label2id={label: i for i, label in enumerate(LABELS + ACTION_LABELS)},
     )
+    model.config.task_label_groups = {"category": list(LABELS), "action": list(ACTION_LABELS)}
     if config.max_length > model.config.max_position_embeddings:
         raise ValueError("max_length exceeds the model's position limit")
     destination.mkdir(parents=True, exist_ok=False)
     (destination / "run_config.json").write_text(json.dumps({
-        **asdict(config), "labels": LABELS, "split_directory": str(source.resolve()),
+        **asdict(config), "labels": LABELS, "action_labels": ACTION_LABELS,
+        "loss": "category_cross_entropy + action_cross_entropy", "split_directory": str(source.resolve()),
         "resolved_model_revision": getattr(model.config, "_commit_hash", None),
     }, indent=2) + "\n", encoding="utf-8")
     arguments = TrainingArguments(

@@ -1,33 +1,59 @@
 """Create train/validation/test Parquet files from the local teacher dataset."""
 
+import json
+from math import isfinite
 from pathlib import Path
 
 import polars as pl
 
 LABELS = ("none", "profanity", "insult", "slur", "sexual", "threat")
+ACTION_LABELS = ("allow", "block_and_review")
+
+
+def _targets(record: dict, labels: tuple[str, ...]) -> list[float]:
+    probabilities = record["decision"]["answer"]["probabilities"]
+    if not isinstance(probabilities, dict) or set(probabilities) != set(labels):
+        raise ValueError(f"Expected probabilities for {labels}")
+    values = [probabilities[label] for label in labels]
+    if any(isinstance(value, bool) or not isinstance(value, (int, float))
+           or not isfinite(value) or not 0 <= value <= 1 for value in values) or sum(values) <= 0:
+        raise ValueError("Expected finite nonnegative probabilities with positive mass")
+    return [value / sum(values) for value in values]
 
 
 def prepare_dataset(source_path: str | Path, output_directory: str | Path, *, seed: int = 42) -> dict[str, Path]:
     """Write approximately 80/10/10 splits, keeping normalized variants together.
 
-    Each file contains original content, six float32 targets in LABELS order, and
-    teacher_argmax. Input is the already-inspected local teacher JSONL. Use a new
+    Input is the pipeline's review_decisions JSONL: category scores are under
+    source.decision and action scores under decision. Each file contains both
+    distributions and their argmax labels. Use a new
     output directory; no existing files are overwritten. Return paths keyed by
     train, validation, and test.
     """
-    teacher_probabilities = pl.col("decision").struct.field("answer").struct.field("probabilities")
-    prepared_messages = pl.read_ndjson(source_path, infer_schema_length=None).filter(
-        pl.col("content").str.strip_chars() != "",
-    ).select(
-        "content",
-        pl.concat_list([teacher_probabilities.struct.field(label) for label in LABELS]).alias("targets"),
-    ).with_columns(
+    rows = []
+    with Path(source_path).open(encoding="utf-8") as reader:
+        for number, line in enumerate(reader, 1):
+            try:
+                record = json.loads(line)
+                content = record["state"] if "state" in record else record["content"]
+                if not isinstance(content, str):
+                    raise ValueError("Expected string chat state")
+                targets = _targets(record["source"], LABELS)
+                action_targets = _targets(record, ACTION_LABELS)
+                if content.strip():
+                    rows.append({"content": content, "targets": targets, "action_targets": action_targets})
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid review result on row {number}: {exc}") from exc
+    if not rows:
+        raise ValueError("No nonempty chats in review results")
+    prepared_messages = pl.DataFrame(rows).with_columns(
         pl.col("targets").list.arg_max().cast(pl.UInt8).alias("teacher_argmax"),
+        pl.col("action_targets").list.arg_max().cast(pl.UInt8).alias("action_teacher_argmax"),
         pl.col("content").map_elements(lambda text: " ".join(text.casefold().split()), return_dtype=pl.String)
         .alias("normalized_content"),
     ).with_columns(
-        pl.concat_list([pl.col("targets").list.get(i) / pl.col("targets").list.sum() for i in range(6)])
-        .cast(pl.Array(pl.Float32, 6)).alias("targets"),
+        pl.col("targets").cast(pl.Array(pl.Float32, len(LABELS))),
+        pl.col("action_targets").cast(pl.Array(pl.Float32, len(ACTION_LABELS))),
     )
 
     # Stratify by each group's modal class; cumulative row counts handle variants.
@@ -51,6 +77,6 @@ def prepare_dataset(source_path: str | Path, output_directory: str | Path, *, se
                    for split_name in ("train", "validation", "test")}
     for split_name, file_path in split_paths.items():
         prepared_messages.filter(pl.col("split") == split_name).select(
-            "content", "targets", "teacher_argmax",
+            "content", "targets", "teacher_argmax", "action_targets", "action_teacher_argmax",
         ).write_parquet(file_path)
     return split_paths
