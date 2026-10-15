@@ -48,7 +48,7 @@ class CombinedPipelineTests(unittest.TestCase):
         patcher = patch("distill_jev.pipeline.generate_review_dataset")
         self.review = patcher.start()
         self.addCleanup(patcher.stop)
-        patcher = patch("distill_jev.pipeline.train_student")
+        patcher = patch("distill_jev.pipeline.train_and_export")
         self.training = patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -84,7 +84,11 @@ class CombinedPipelineTests(unittest.TestCase):
                     source=destination,
                     destination=review_inputs,
                 )
-                self.training.assert_called_once_with(review_decisions)
+                self.training.assert_called_once_with(
+                    source=review_decisions,
+                    training_data_directory="cache/deberta/review-splits",
+                    onnx_output_directory=None,
+                )
                 destination.write_text("completed output")
                 self.predict.reset_mock()
                 self.review.reset_mock()

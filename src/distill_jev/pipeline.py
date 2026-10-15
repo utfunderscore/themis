@@ -11,14 +11,14 @@ from distill_jev.datasets.download_minecraft_server_chat import (
     download as download_minecraft_chats,
 )
 from distill_jev.datasets.sampling import guided_sample_dataset
-from distill_jev.models.deberta.dataset import prepare_dataset as prepare_training_dataset
+from distill_jev.models.deberta.workflow import train_and_export
 from distill_jev.models.decision.perplexity.bulk import predict_dataset
 from distill_jev.models.decision.perplexity.dataset import prepare_dataset
 from distill_jev.models.decision.perplexity.questions import CATEGORY_QUESTION
 from distill_jev.models.koala.moderation import moderate_dataset
 
 
-def pipeline() -> None:
+def pipeline():
     """Score 100k chats for category and review, then train the DeBERTa student."""
     deduplicated = Path("cache/combined_chats_deduplicated.jsonl")
     koala_predictions = Path("cache/combined_chats_moderated.jsonl")
@@ -91,50 +91,12 @@ def pipeline() -> None:
             rows_per_shard=1024,
             max_containers=4,
         )
-    train_student(review_decisions)
+    train_and_export(
+        source=review_decisions,
+        training_data_directory="cache/deberta/review-splits",
+        onnx_output_directory=None,
+    )
     print("Pipeline complete.", flush=True)
-
-
-def export_student(
-    model_directory: str | Path,
-    output_directory: str | Path = "cache/deberta/onnx",
-    *,
-    max_length: int | None = None,
-) -> Path:
-    """Export a local/downloaded training run; requires training and onnx extras."""
-    from distill_jev.models.deberta.onnx_export import export_onnx
-
-    return export_onnx(model_directory, output_directory, max_length=max_length)
-
-
-def train_student(source: str | Path) -> None:
-    """Prepare dual-target splits and train on Modal, recording completed runs."""
-    splits = Path("cache/deberta/review-splits")
-    # output = Path("cache/deberta/review-run")
-    receipt = splits.parent / "review-modal-run.json"
-    if receipt.is_file():
-        print(f"Reusing completed Modal training: {receipt}", flush=True)
-        return
-    # Local training alternative:
-    # if (output / "metrics.json").is_file() and (output / "model" / "config.json").is_file():
-    #     print(f"Reusing completed training: {output}", flush=True)
-    #     return
-    # if output.exists():
-    #     raise FileExistsError(f"Incomplete training output at {output}; move it aside before retrying")
-
-    from distill_jev.models.deberta.modal_training import train
-
-    # from distill_jev.models.deberta.training import train
-
-    if all((splits / f"{split}.parquet").is_file() for split in ("train", "validation", "test")):
-        print(f"Reusing training splits: {splits}", flush=True)
-    else:
-        prepare_training_dataset(source, splits)
-    result = train(splits)
-    temporary = receipt.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(receipt)
-    # train(splits, output)
 
 
 def generate_review_dataset(source: str | Path, destination: str | Path) -> Path:

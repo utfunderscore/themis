@@ -29,18 +29,19 @@ if HAS_TRAINING:
 @unittest.skipUnless(HAS_TRAINING, "Install the training extra to run trainer tests")
 class DebertaTrainingTests(unittest.TestCase):
     def test_pipeline_training_prepares_reuses_and_preserves_outputs(self):
-        from distill_jev.pipeline import train_student
+        from distill_jev.models.deberta.workflow import train_student
 
         with TemporaryDirectory() as temp, chdir(temp):
             source = Path("reviews.jsonl")
             splits = Path("cache/deberta/review-splits")
             receipt = Path("cache/deberta/review-modal-run.json")
-            with (patch("distill_jev.pipeline.prepare_training_dataset") as prepare,
+            with (patch("distill_jev.models.deberta.workflow.prepare_training_dataset") as prepare,
+                  patch("distill_jev.models.deberta.workflow.download_student"),
                   patch("distill_jev.models.deberta.modal_training.train", return_value={"run_id": "test"}) as training):
                 splits.parent.mkdir(parents=True)
                 train_student(source)
-                prepare.assert_called_once_with(source, splits)
-                training.assert_called_once_with(splits)
+                prepare.assert_called_once_with(source_path=source, output_directory=splits)
+                training.assert_called_once_with(split_directory=splits)
                 self.assertEqual(json.loads(receipt.read_text()), {"run_id": "test"})
                 receipt.unlink()
                 splits.mkdir()
