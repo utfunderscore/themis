@@ -116,3 +116,23 @@ and apply softmax **separately** to `logits[..., :6]` and `logits[..., 6:]`.
 Never apply one softmax across all eight logits. Action argmax 1 means block for
 human review; 0 means allow, independently of category. Class order and task
 groups are recorded in the model configuration.
+
+## Inference
+
+With the training dependencies installed and the completed artifacts downloaded:
+
+```python
+from distill_jev.models.deberta.inference import Moderation
+
+moderation = Moderation("cache/deberta/modal-run")
+results = moderation.predict(["hello everyone", "another chat message"], batch_size=32)
+```
+
+Pass the training output directory or its `model/` subdirectory. The loader reads
+the token limit from the adjacent `run_config.json`; if you only have `model/`,
+pass `max_length` with the value used in training. CUDA is selected when available;
+pass `device="cpu"` to force CPU. Reuse the instance across calls.
+
+Each result contains `category`, `action`, `category_probabilities`, and
+`action_probabilities`. Both probability dictionaries sum independently to one.
+Results preserve input order; `block_and_review` means send for human review.

@@ -95,6 +95,18 @@ def pipeline() -> None:
     print("Pipeline complete.", flush=True)
 
 
+def export_student(
+    model_directory: str | Path,
+    output_directory: str | Path = "cache/deberta/onnx",
+    *,
+    max_length: int | None = None,
+) -> Path:
+    """Export a local/downloaded training run; requires training and onnx extras."""
+    from distill_jev.models.deberta.onnx_export import export_onnx
+
+    return export_onnx(model_directory, output_directory, max_length=max_length)
+
+
 def train_student(source: str | Path) -> None:
     """Prepare dual-target splits and train on Modal, recording completed runs."""
     splits = Path("cache/deberta/review-splits")

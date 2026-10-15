@@ -13,6 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+onnx = ["onnx>=1.17,<2", "onnxruntime>=1.20,<2"]
 training = [
     "numpy>=2,<3",
     "torch==2.8.0",
