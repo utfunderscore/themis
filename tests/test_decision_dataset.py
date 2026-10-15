@@ -7,15 +7,20 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from distill_jev.models.decision.perplexity.dataset import dataset_manifest, split_dataset
+from distill_jev.models.decision.perplexity.dataset import (
+    dataset_manifest,
+    prepare_dataset,
+    split_dataset,
+)
 
 QUESTION = {"type": "choice", "criteria": {"b": "B", "a": "A"}}
 
 
 class DatasetTests(unittest.TestCase):
     def test_shards_preserve_original_bytes_metadata_and_order(self):
-        rows = [{"content": f"héllo {i}", "moderation": {"OK": 0.3},
-                 "sampling": {"source_row_index": i}} for i in range(259)]
+        rows = [{"state": f"héllo {i}", "question": QUESTION,
+                 "source": {"content": f"héllo {i}", "moderation": {"OK": 0.3},
+                            "sampling": {"source_row_index": i}}} for i in range(259)]
         raw = b"".join((json.dumps(row, ensure_ascii=False) +
                         ("\r\n" if i < 258 else "")).encode() for i, row in enumerate(rows))
         with TemporaryDirectory() as temp:
@@ -37,42 +42,46 @@ class DatasetTests(unittest.TestCase):
             source.touch()
             self.assertEqual(split_dataset(source, temp), ([], sha256(b"").hexdigest(), 0))
 
-    def test_invalid_text_existing_scores_and_shard_size(self):
+    def test_invalid_native_rows_existing_scores_and_shard_size(self):
         with TemporaryDirectory() as temp:
             source = Path(temp) / "input"
-            for row in ({"content": 42}, {"content": "hello", "decision": {}}):
+            for row in ({"state": "hello"}, {"state": "hello", "question": {"type": "noul"}, "decision": {}}):
                 source.write_text(json.dumps(row))
                 with self.assertRaisesRegex(ValueError, "Row 1"):
                     split_dataset(source, temp)
             with self.assertRaises(ValueError):
                 split_dataset(source, temp, rows_per_shard=0)
 
-    def test_custom_field_and_existing_files(self):
+    def test_preparation_preserves_source_and_can_include_native_fields(self):
         with TemporaryDirectory() as temp:
             source = Path(temp) / "input"
-            source.write_text('{"message":"hello","images":["source metadata"]}\n')
-            shards, _, _ = split_dataset(source, temp, text_field="message")
-            self.assertEqual(shards[0].read_bytes(), source.read_bytes())
-            with self.assertRaises(FileExistsError):
-                split_dataset(source, temp, text_field="message")
+            prepared = Path(temp) / "prepared"
+            record = {"message": "hello", "images": ["data:image/png;base64,xxx"], "id": 3}
+            source.write_text(json.dumps(record) + "\n")
+            self.assertEqual(prepare_dataset(source, prepared, question=QUESTION,
+                                             text_field="message", native_fields=("images",)), prepared)
+            row = json.loads(prepared.read_text())
+            self.assertEqual(row["state"], "hello")
+            self.assertEqual(row["question"], QUESTION)
+            self.assertEqual(row["images"], record["images"])
+            self.assertEqual(row["source"], record)
 
-    def test_candidate_order_is_semantic_and_question_is_not_mutated(self):
-        def manifest(question):
-            return dataset_manifest("checksum", 1, question=question)
-
-        self.assertEqual(manifest(QUESTION), manifest(dict(reversed(list(QUESTION.items())))))
-        self.assertNotEqual(manifest(QUESTION), manifest({**QUESTION, "criteria": {"a": "A", "b": "B"}}))
-        self.assertEqual(json.loads(manifest(QUESTION))["question"]["criteria"], [["b", "B"], ["a", "A"]])
-        self.assertEqual(QUESTION["criteria"], {"b": "B", "a": "A"})
-        self.assertNotEqual(manifest({"type": "score", "criteria": ["low", "high"]}),
-                            manifest({"type": "score", "criteria": ["high", "low"]}))
+    def test_candidate_order_is_preserved_by_prepared_input_bytes(self):
+        with TemporaryDirectory() as temp:
+            source = Path(temp) / "source"
+            source.write_text('{"content":"hello"}\n')
+            first, second = Path(temp) / "first", Path(temp) / "second"
+            prepare_dataset(source, first, question=QUESTION)
+            prepare_dataset(source, second, question={**QUESTION, "criteria": {"a": "A", "b": "B"}})
+            self.assertNotEqual(first.read_bytes(), second.read_bytes())
+            self.assertEqual(QUESTION["criteria"], {"b": "B", "a": "A"})
 
     def test_identity_covers_input_and_inference_settings(self):
-        baseline = dataset_manifest("checksum", 1, question=QUESTION)
-        for kwargs in ({"text_field": "message"}, {"batch_size": 16}, {"rows_per_shard": 64}):
-            self.assertNotEqual(baseline, dataset_manifest("checksum", 1, question=QUESTION, **kwargs))
+        baseline = dataset_manifest("checksum", 1)
+        for kwargs in ({"batch_size": 16}, {"rows_per_shard": 64}):
+            self.assertNotEqual(baseline, dataset_manifest("checksum", 1, **kwargs))
         for checksum, count in (("different", 1), ("checksum", 2)):
-            self.assertNotEqual(baseline, dataset_manifest(checksum, count, question=QUESTION))
+            self.assertNotEqual(baseline, dataset_manifest(checksum, count))
         for name in ("MODEL_REVISION", "PIPELINE_VERSION", "NUMERICAL_POLICY", "PROCESSING_WINDOW"):
             with patch(f"distill_jev.models.decision.perplexity.dataset.{name}", "changed"):
-                self.assertNotEqual(baseline, dataset_manifest("checksum", 1, question=QUESTION))
+                self.assertNotEqual(baseline, dataset_manifest("checksum", 1))

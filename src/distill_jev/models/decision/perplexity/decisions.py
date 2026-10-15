@@ -111,11 +111,10 @@ class Decisions:
         ]
 
     @modal.method()
-    def predict_file(self, input_path: str, question: dict[str, Any],
-                     text_field: str, batch_size: int) -> dict[str, Any]:
+    def predict_file(self, input_path: str, batch_size: int) -> dict[str, Any]:
         from .bulk import _predict_file
 
-        return _predict_file(input_path, question, text_field, batch_size, self.predict.local)
+        return _predict_file(input_path, batch_size, self.predict.local)
 
 
 def predict_decisions(rows: list[dict[str, Any]], *,

@@ -17,7 +17,7 @@ from .decisions import Decisions, app, completed, data_volume, download_model
 from .progress import RUN_STARTED_AT_ENV, log
 
 
-def _predict_file(input_path, question, text_field, batch_size, predict, *, data_root=Path("/data")):
+def _predict_file(input_path, batch_size, predict, *, data_root=Path("/data")):
     """Commit a closed result before atomically publishing its completion entry."""
     if saved := completed.get(input_path):
         return saved
@@ -30,9 +30,7 @@ def _predict_file(input_path, question, text_field, batch_size, predict, *, data
     with source.open(encoding="utf-8") as reader, result.open("wb") as writer:
         while lines := list(islice(reader, PROCESSING_WINDOW)):
             records = [json.loads(line) for line in lines]
-            predictions = predict([
-                {"state": row[text_field], "question": question} for row in records
-            ], batch_size)
+            predictions = predict(records, batch_size)
             for row, prediction in zip(records, predictions, strict=True):
                 row["decision"] = prediction
                 payload = (json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n").encode()
@@ -46,8 +44,8 @@ def _predict_file(input_path, question, text_field, batch_size, predict, *, data
     return saved
 
 
-def predict_dataset(input_path: str | Path, output_path: str | Path, *, question: dict,
-                    text_field: str = "content", batch_size: int = DEFAULT_BATCH_SIZE,
+def predict_dataset(input_path: str | Path, output_path: str | Path, *,
+                    batch_size: int = DEFAULT_BATCH_SIZE,
                     rows_per_shard: int = 1024, max_containers: int = 1) -> Path:
     """Score JSONL in source order, resuming completed shards on subsequent calls.
 
@@ -63,14 +61,11 @@ def predict_dataset(input_path: str | Path, output_path: str | Path, *, question
     source, destination = Path(input_path), Path(output_path)
     if source.resolve() == destination.resolve() or (destination.exists() and source.samefile(destination)):
         raise ValueError("input_path and output_path must differ")
-    # Keep the submitted question identical to the question used for identity.
-    question = json.loads(json.dumps(question, allow_nan=False))
     destination.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="decisions-", dir=destination.parent) as temp:
-        shards, checksum, total = split_dataset(source, temp, text_field=text_field,
-                                               rows_per_shard=rows_per_shard)
-        manifest = dataset_manifest(checksum, total, question=question, text_field=text_field,
-                                    batch_size=batch_size, rows_per_shard=rows_per_shard)
+        shards, checksum, total = split_dataset(source, temp, rows_per_shard=rows_per_shard)
+        manifest = dataset_manifest(checksum, total, batch_size=batch_size,
+                                     rows_per_shard=rows_per_shard)
         job_path = f"jobs/{sha256(manifest).hexdigest()}"
         paths = [f"{job_path}/{shard.name}" for shard in shards]
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -90,8 +85,7 @@ def predict_dataset(input_path: str | Path, output_path: str | Path, *, question
                     env={RUN_STARTED_AT_ENV: str(started_at)},
                 )()
                 for count, _ in enumerate(worker.predict_file.map(
-                    pending, kwargs={"question": question, "text_field": text_field,
-                                     "batch_size": batch_size}, order_outputs=False,
+                    pending, kwargs={"batch_size": batch_size}, order_outputs=False,
                 ), 1):
                     log(f"Completed {count}/{len(pending)} submitted shards", started_at=started_at)
             # Read the durable entries, rather than treating RPC success as a checkpoint.

@@ -1,5 +1,17 @@
 """Decision questions for the Perplexity classifier."""
 
+import json
+
+
+def validate_question(question: object) -> None:
+    """Check serialization, leaving native question validation to the model."""
+    if not isinstance(question, dict):
+        raise ValueError("A question object is required")
+    try:
+        json.dumps(question, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Question must contain finite JSON values") from exc
+
 CATEGORY_QUESTION = {
     "type": "choice",
     "instructions": "Which single type of offensive content is this message, if any?",

@@ -52,8 +52,10 @@ class BulkTests(unittest.TestCase):
         self.remote = self.root / "remote"
         self.remote.mkdir()
         self.source, self.output = self.root / "input.jsonl", self.root / "output.jsonl"
-        self.source.write_text("".join(json.dumps({"content": str(i), "id": i,
-                                                 "moderation": {"OK": 0.5}}) + "\n" for i in range(5)))
+        self.source.write_text("".join(json.dumps({
+            "state": str(i), "question": {"type": "noul"},
+            "source": {"content": str(i), "id": i, "moderation": {"OK": 0.5}},
+        }) + "\n" for i in range(5)))
         self.output.write_text("previous result")
         self.volume = MemoryVolume(self.remote)
         self.completed = {}
@@ -67,6 +69,7 @@ class BulkTests(unittest.TestCase):
         self.worker = stack.enter_context(patch.object(bulk, "Decisions"))
         self.worker.with_options.return_value.return_value.predict_file.map.side_effect = self.score
         self.processed = []
+        self.predicted_rows = []
         self.fail_shard = None
 
     def score(self, paths, *, kwargs, order_outputs):
@@ -77,19 +80,18 @@ class BulkTests(unittest.TestCase):
                 raise RuntimeError("inference failed")
             yield bulk._predict_file(path, **kwargs, predict=self.predict, data_root=self.remote)
 
-    @staticmethod
-    def predict(rows, batch_size):
+    def predict(self, rows, batch_size):
+        self.predicted_rows.extend(json.loads(json.dumps(row)) for row in rows)
         return [{"answer": row["state"], "probabilities": [0.2, 0.8]} for row in rows]
 
     def run_job(self, **kwargs):
-        return bulk.predict_dataset(self.source, self.output, question={"type": "noul"},
-                                    rows_per_shard=2, **kwargs)
+        return bulk.predict_dataset(self.source, self.output, rows_per_shard=2, **kwargs)
 
     def assert_results(self):
         rows = [json.loads(line) for line in self.output.read_text().splitlines()]
-        self.assertEqual([row["id"] for row in rows], list(range(5)))
+        self.assertEqual([row["source"]["id"] for row in rows], list(range(5)))
         self.assertEqual([row["decision"]["answer"] for row in rows], list(map(str, range(5))))
-        self.assertTrue(all(row["moderation"] == {"OK": 0.5} for row in rows))
+        self.assertTrue(all(row["source"]["moderation"] == {"OK": 0.5} for row in rows))
 
     def test_failure_resumes_only_unfinished_shards_and_restores_order(self):
         self.fail_shard = "000001.jsonl"
@@ -107,6 +109,13 @@ class BulkTests(unittest.TestCase):
         self.assertEqual(options["max_containers"], 2)
         self.assertGreater(float(options["env"][bulk.RUN_STARTED_AT_ENV]), 0)
         self.assert_results()
+
+    def test_passes_prepared_native_rows_directly_to_predict(self):
+        self.run_job()
+        self.assertEqual(
+            sorted(self.predicted_rows, key=lambda row: row["source"]["id"]),
+            [json.loads(line) for line in self.source.read_text().splitlines()],
+        )
 
     def test_download_failure_resumes_without_gpu_or_upload(self):
         self.volume.fail_download = True
@@ -144,7 +153,7 @@ class BulkTests(unittest.TestCase):
         path, saved = next(iter(self.completed.items()))
         def fail(*args):
             raise AssertionError("already completed")
-        self.assertEqual(bulk._predict_file(path, {}, "content", 32, fail, data_root=self.remote), saved)
+        self.assertEqual(bulk._predict_file(path, 32, fail, data_root=self.remote), saved)
 
     def test_corrupt_results_and_publication_failure_preserve_output(self):
         self.run_job()
