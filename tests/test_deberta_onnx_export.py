@@ -14,8 +14,8 @@ class OnnxExportTests(unittest.TestCase):
     def test_relative_attention_export_and_bundle(self):
         from transformers import BertTokenizer, DebertaV2Config, DebertaV2ForSequenceClassification
 
-        from distill_jev.models.deberta.dataset import ACTION_LABELS, LABELS
-        from distill_jev.models.deberta.onnx_export import export_onnx
+        from themis.models.deberta.dataset import ACTION_LABELS, LABELS
+        from themis.models.deberta.onnx_export import export_onnx
 
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from distill_jev.models.decision.perplexity import bulk
+from themis.models.decision.perplexity import bulk
 
 
 class MemoryVolume:

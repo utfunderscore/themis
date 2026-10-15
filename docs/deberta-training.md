@@ -2,13 +2,13 @@
 
 ## Training on Modal
 
-The separate `distill_jev.models.deberta.modal_training` module runs the same
+The separate `themis.models.deberta.modal_training` module runs the same
 dual-target trainer on an H100 GPU (4 CPUs, 32 GiB RAM, 24-hour timeout).
 Only the base project dependencies are needed locally. Authenticate once with
 `uv run modal setup`, then call from Python with your prepared splits:
 
 ```python
-from distill_jev.models.deberta.modal_training import train
+from themis.models.deberta.modal_training import train
 
 result = train(
     "cache/deberta/review-splits",
@@ -23,11 +23,11 @@ and returns metrics and Volume-relative artifact paths. Each call creates a uniq
 run ID, printed before training starts. Keep the calling process running until it
 finishes.
 
-Models, checkpoints, and metrics persist in the `distill-jev-deberta-training`
+Models, checkpoints, and metrics persist in the `themis-deberta-training`
 Modal Volume under `runs/<run_id>/output`. Download a completed run with:
 
 ```sh
-uv run modal volume get distill-jev-deberta-training runs/<run_id>/output cache/deberta/modal-run
+uv run modal volume get themis-deberta-training runs/<run_id>/output cache/deberta/modal-run
 ```
 
 Hugging Face downloads are cached in the same Volume. Failed runs preserve partial
@@ -61,7 +61,7 @@ Regenerate splits from the pipeline's completed second-pass results (old categor
 splits are incompatible):
 
 ```python
-from distill_jev.models.deberta import prepare_dataset
+from themis.models.deberta import prepare_dataset
 
 prepare_dataset(
     "cache/combined_chats_inference_sample_100k_review_decisions.jsonl",
@@ -72,13 +72,13 @@ prepare_dataset(
 Run using those splits (choose a new output directory):
 
 ```sh
-uv run --no-sync python -c 'from distill_jev.models.deberta.training import train; train("cache/deberta/review-splits", "cache/deberta/run-001")'
+uv run --no-sync python -c 'from themis.models.deberta.training import train; train("cache/deberta/review-splits", "cache/deberta/run-001")'
 ```
 
 Or call from Python on your training machine:
 
 ```python
-from distill_jev.models.deberta.training import TrainingConfig, train
+from themis.models.deberta.training import TrainingConfig, train
 
 result = train(
     "path/to/splits",  # train.parquet, validation.parquet, test.parquet
@@ -122,7 +122,7 @@ groups are recorded in the model configuration.
 With the training dependencies installed and the completed artifacts downloaded:
 
 ```python
-from distill_jev.models.deberta.inference import Moderation
+from themis.models.deberta.inference import Moderation
 
 moderation = Moderation("cache/deberta/modal-run")
 results = moderation.predict(["hello everyone", "another chat message"], batch_size=32)

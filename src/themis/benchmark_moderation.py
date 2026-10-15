@@ -9,7 +9,7 @@ import modal
 
 from .moderation import MODEL_DIR, download_model, inference_image, volume
 
-app = modal.App("distill-jev-moderation-benchmark")
+app = modal.App("themis-moderation-benchmark")
 
 
 @app.function(image=inference_image, gpu="T4", volumes={"/models": volume}, timeout=600)

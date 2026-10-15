@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from distill_jev.models.deberta import modal_training
+from themis.models.deberta import modal_training
 
 
 class ModalTrainingTests(unittest.TestCase):

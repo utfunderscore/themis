@@ -19,7 +19,7 @@ from typing import Protocol, cast
 
 import modal
 
-from distill_jev._model_types import HubModule, Model, Tokenizer, TorchModule, TransformersModule
+from themis._model_types import HubModule, Model, Tokenizer, TorchModule, TransformersModule
 
 
 class Progress(Protocol):
@@ -34,9 +34,9 @@ MODEL_REVISION = "838ade0edb66dcffc5532d08ff6ed5c899abfb5c"
 PIPELINE_VERSION = 2  # FP16 weights, length bucketing, FP32 softmax.
 MODEL_DIR = f"/models/{MODEL_REVISION}"
 
-app = modal.App("distill-jev-moderation")
-volume = modal.Volume.from_name("distill-jev-moderation-models", create_if_missing=True)
-data_volume = modal.Volume.from_name("distill-jev-moderation-data", create_if_missing=True)
+app = modal.App("themis-moderation")
+volume = modal.Volume.from_name("themis-moderation-models", create_if_missing=True)
+data_volume = modal.Volume.from_name("themis-moderation-data", create_if_missing=True)
 download_image = modal.Image.debian_slim(python_version="3.13").pip_install(
     "huggingface-hub==0.36.0"
 )
@@ -220,7 +220,7 @@ def _job_manifest(
 @contextmanager
 def _job_lock(job_id: str) -> Generator[None]:
     """Serialize same-job callers on this machine, including publication/cleanup."""
-    directory = Path(gettempdir()) / f"distill-jev-moderation-{os.getuid()}"
+    directory = Path(gettempdir()) / f"themis-moderation-{os.getuid()}"
     directory.mkdir(mode=0o700, exist_ok=True)
     # Keep the inode after unlock: deleting lock files can let waiters race.
     with (directory / f"{job_id}.lock").open("a") as lock:

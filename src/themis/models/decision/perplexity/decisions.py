@@ -13,10 +13,10 @@ from .policy import INFERENCE_PACKAGES, MODEL_ID, MODEL_REVISION
 from .progress import log, stage
 
 MODEL_DIR = f"/models/{MODEL_REVISION}"
-app = modal.App("distill-jev-decisions")
-volume = modal.Volume.from_name("distill-jev-decision-models", create_if_missing=True)
-data_volume = modal.Volume.from_name("distill-jev-decision-data", create_if_missing=True)
-completed = modal.Dict.from_name("distill-jev-decision-shards", create_if_missing=True)
+app = modal.App("themis-decisions")
+volume = modal.Volume.from_name("themis-decision-models", create_if_missing=True)
+data_volume = modal.Volume.from_name("themis-decision-data", create_if_missing=True)
+completed = modal.Dict.from_name("themis-decision-shards", create_if_missing=True)
 download_image = modal.Image.debian_slim(python_version="3.13").pip_install(
     "huggingface-hub==1.31.0"
 )

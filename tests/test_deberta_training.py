@@ -16,8 +16,8 @@ if HAS_TRAINING:
     import torch
     from transformers import BertTokenizerFast, DebertaV2Config, DebertaV2ForSequenceClassification
 
-    from distill_jev.models.deberta import ACTION_LABELS, LABELS
-    from distill_jev.models.deberta.training import (
+    from themis.models.deberta import ACTION_LABELS, LABELS
+    from themis.models.deberta.training import (
         SoftTargetDataset,
         TrainingConfig,
         soft_target_loss,
@@ -29,15 +29,15 @@ if HAS_TRAINING:
 @unittest.skipUnless(HAS_TRAINING, "Install the training extra to run trainer tests")
 class DebertaTrainingTests(unittest.TestCase):
     def test_pipeline_training_prepares_reuses_and_preserves_outputs(self):
-        from distill_jev.models.deberta.workflow import train_student
+        from themis.models.deberta.workflow import train_student
 
         with TemporaryDirectory() as temp, chdir(temp):
             source = Path("reviews.jsonl")
             splits = Path("cache/deberta/review-splits")
             receipt = Path("cache/deberta/review-modal-run.json")
-            with (patch("distill_jev.models.deberta.workflow.prepare_training_dataset") as prepare,
-                  patch("distill_jev.models.deberta.workflow.download_student"),
-                  patch("distill_jev.models.deberta.modal_training.train", return_value={"run_id": "test"}) as training):
+            with (patch("themis.models.deberta.workflow.prepare_training_dataset") as prepare,
+                  patch("themis.models.deberta.workflow.download_student"),
+                  patch("themis.models.deberta.modal_training.train", return_value={"run_id": "test"}) as training):
                 splits.parent.mkdir(parents=True)
                 train_student(source)
                 prepare.assert_called_once_with(source_path=source, output_directory=splits)

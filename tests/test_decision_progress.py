@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from distill_jev.models.decision.perplexity import progress
+from themis.models.decision.perplexity import progress
 
 
 class ProgressTests(unittest.TestCase):

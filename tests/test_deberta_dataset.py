@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 import polars as pl
 
-from distill_jev.models.deberta import ACTION_LABELS, LABELS, prepare_dataset
+from themis.models.deberta import ACTION_LABELS, LABELS, prepare_dataset
 
 
 class DebertaDatasetTests(unittest.TestCase):

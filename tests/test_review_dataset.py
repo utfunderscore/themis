@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from distill_jev.models.decision.perplexity.dataset import split_dataset
-from distill_jev.pipeline import generate_review_dataset
+from themis.models.decision.perplexity.dataset import split_dataset
+from themis.pipeline import generate_review_dataset
 
 
 class ReviewDatasetTests(unittest.TestCase):

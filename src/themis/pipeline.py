@@ -5,17 +5,17 @@ from tempfile import TemporaryDirectory
 
 import polars as pl
 
-from distill_jev.datasets.deduplication import deduplicate_chats
-from distill_jev.datasets.download_2b2t_chat import download as download_2b2t_chats
-from distill_jev.datasets.download_minecraft_server_chat import (
+from themis.datasets.deduplication import deduplicate_chats
+from themis.datasets.download_2b2t_chat import download as download_2b2t_chats
+from themis.datasets.download_minecraft_server_chat import (
     download as download_minecraft_chats,
 )
-from distill_jev.datasets.sampling import guided_sample_dataset
-from distill_jev.models.deberta.workflow import train_and_export
-from distill_jev.models.decision.perplexity.bulk import predict_dataset
-from distill_jev.models.decision.perplexity.dataset import prepare_dataset
-from distill_jev.models.decision.perplexity.questions import CATEGORY_QUESTION
-from distill_jev.models.koala.moderation import moderate_dataset
+from themis.datasets.sampling import guided_sample_dataset
+from themis.models.deberta.workflow import train_and_export
+from themis.models.decision.perplexity.bulk import predict_dataset
+from themis.models.decision.perplexity.dataset import prepare_dataset
+from themis.models.decision.perplexity.questions import CATEGORY_QUESTION
+from themis.models.koala.moderation import moderate_dataset
 
 
 def pipeline():

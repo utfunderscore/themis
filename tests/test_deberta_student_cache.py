@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from distill_jev.models.deberta.workflow import download_student
+from themis.models.deberta.workflow import download_student
 
 
 class StudentCacheTests(unittest.TestCase):

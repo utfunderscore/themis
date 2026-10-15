@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from distill_jev.models.decision.perplexity.batching import (
+from themis.models.decision.perplexity.batching import (
     plan_batches, predict_indexed_batch, predict_length_batched, rendered_input_lengths,
 )
 
@@ -40,7 +40,7 @@ class DecisionBatchingTests(unittest.TestCase):
             predict=predict,
         )
         cuda = SimpleNamespace(OutOfMemoryError=MemoryError, synchronize=MagicMock(), empty_cache=MagicMock())
-        with patch("distill_jev.models.decision.perplexity.batching.import_module",
+        with patch("themis.models.decision.perplexity.batching.import_module",
                    return_value=SimpleNamespace(cuda=cuda)):
             probabilities, stats = predict_length_batched(model, rows)
         self.assertEqual(probabilities, [[index] for index in range(65)])

@@ -1,5 +1,5 @@
 [project]
-name = "distill-jev"
+name = "themis"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -45,7 +45,7 @@ url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [project.scripts]
-distill-jev = "distill_jev:main"
+themis = "themis:main"
 
 [build-system]
 requires = ["uv_build>=0.12.22,<0.13.0"]

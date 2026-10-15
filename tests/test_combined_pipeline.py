@@ -7,8 +7,8 @@ from unittest.mock import call, patch
 
 import polars as pl
 
-from distill_jev.datasets.deduplication import deduplicate_chats
-from distill_jev.pipeline import generate_review_dataset, pipeline
+from themis.datasets.deduplication import deduplicate_chats
+from themis.pipeline import generate_review_dataset, pipeline
 
 
 class CombinedPipelineTests(unittest.TestCase):
@@ -39,21 +39,21 @@ class CombinedPipelineTests(unittest.TestCase):
 
     def setUp(self):
         # Pipeline tests must never start paid Perplexity inference.
-        patcher = patch("distill_jev.pipeline.predict_dataset")
+        patcher = patch("themis.pipeline.predict_dataset")
         self.predict = patcher.start()
         self.addCleanup(patcher.stop)
-        patcher = patch("distill_jev.pipeline.prepare_dataset")
+        patcher = patch("themis.pipeline.prepare_dataset")
         self.prepare = patcher.start()
         self.addCleanup(patcher.stop)
-        patcher = patch("distill_jev.pipeline.generate_review_dataset")
+        patcher = patch("themis.pipeline.generate_review_dataset")
         self.review = patcher.start()
         self.addCleanup(patcher.stop)
-        patcher = patch("distill_jev.pipeline.train_and_export")
+        patcher = patch("themis.pipeline.train_and_export")
         self.training = patcher.start()
         self.addCleanup(patcher.stop)
 
     def test_pipeline_scores_sample_and_reuses_completed_predictions(self):
-        from distill_jev.models.decision.perplexity.questions import CATEGORY_QUESTION
+        from themis.models.decision.perplexity.questions import CATEGORY_QUESTION
 
         with TemporaryDirectory() as directory, chdir(directory):
             source = Path("cache/combined_chats_moderated.jsonl")
@@ -62,7 +62,7 @@ class CombinedPipelineTests(unittest.TestCase):
             destination = Path("cache/combined_chats_inference_sample_100k_decisions.jsonl")
             review_inputs = Path("cache/combined_chats_inference_sample_100k_review_inputs.jsonl")
             review_decisions = Path("cache/combined_chats_inference_sample_100k_review_decisions.jsonl")
-            with patch("distill_jev.pipeline.guided_sample_dataset"):
+            with patch("themis.pipeline.guided_sample_dataset"):
                 pipeline()
                 self.prepare.assert_called_once_with(
                     source=Path("cache/combined_chats_inference_sample_100k.jsonl"),
@@ -106,7 +106,7 @@ class CombinedPipelineTests(unittest.TestCase):
             source.parent.mkdir()
             source.touch()
             self.predict.side_effect = RuntimeError("inference failed")
-            with (patch("distill_jev.pipeline.guided_sample_dataset"),
+            with (patch("themis.pipeline.guided_sample_dataset"),
                   patch("builtins.print") as output):
                 with self.assertRaisesRegex(RuntimeError, "inference failed"):
                     pipeline()
@@ -136,7 +136,7 @@ class CombinedPipelineTests(unittest.TestCase):
                 return output_path
 
             self.predict.side_effect = score_review
-            with patch("distill_jev.pipeline.guided_sample_dataset"):
+            with patch("themis.pipeline.guided_sample_dataset"):
                 pipeline()
             output = Path("cache/combined_chats_inference_sample_100k_review_inputs.jsonl")
             review_decisions = Path("cache/combined_chats_inference_sample_100k_review_decisions.jsonl")
@@ -160,7 +160,7 @@ class CombinedPipelineTests(unittest.TestCase):
             Path("cache/combined_chats_inference_sample_100k_decisions.jsonl").touch()
             destination = Path("cache/combined_chats_inference_sample_100k_review_decisions.jsonl")
             destination.write_text("completed review output")
-            with patch("distill_jev.pipeline.guided_sample_dataset"):
+            with patch("themis.pipeline.guided_sample_dataset"):
                 pipeline()
             self.prepare.assert_not_called()
             self.review.assert_not_called()
@@ -180,7 +180,7 @@ class CombinedPipelineTests(unittest.TestCase):
             }) + "\n")
             self.review.side_effect = generate_review_dataset
             self.predict.side_effect = RuntimeError("review inference failed")
-            with (patch("distill_jev.pipeline.guided_sample_dataset"),
+            with (patch("themis.pipeline.guided_sample_dataset"),
                   patch("builtins.print") as output):
                 with self.assertRaisesRegex(RuntimeError, "review inference failed"):
                     pipeline()
@@ -201,7 +201,7 @@ class CombinedPipelineTests(unittest.TestCase):
             source.parent.mkdir()
             source.touch()
             self.review.side_effect = ValueError("invalid predictions")
-            with (patch("distill_jev.pipeline.guided_sample_dataset"),
+            with (patch("themis.pipeline.guided_sample_dataset"),
                   patch("builtins.print") as output):
                 with self.assertRaisesRegex(ValueError, "invalid predictions"):
                     pipeline()
@@ -210,8 +210,8 @@ class CombinedPipelineTests(unittest.TestCase):
     def test_training_failure_does_not_report_completion(self):
         with TemporaryDirectory() as directory, chdir(directory):
             self.training.side_effect = RuntimeError("training failed")
-            with (patch("distill_jev.pipeline.Path.is_file", return_value=True),
-                  patch("distill_jev.pipeline.guided_sample_dataset"),
+            with (patch("themis.pipeline.Path.is_file", return_value=True),
+                  patch("themis.pipeline.guided_sample_dataset"),
                   patch("builtins.print") as output):
                 with self.assertRaisesRegex(RuntimeError, "training failed"):
                     pipeline()
@@ -240,10 +240,10 @@ class CombinedPipelineTests(unittest.TestCase):
         }).lazy()
         with TemporaryDirectory() as directory, chdir(directory):
             with (
-                patch("distill_jev.pipeline.download_minecraft_chats", return_value=minecraft) as first,
-                patch("distill_jev.pipeline.download_2b2t_chats", return_value=two_b_two_t) as second,
-                patch("distill_jev.pipeline.moderate_dataset") as moderate,
-                patch("distill_jev.pipeline.guided_sample_dataset") as sample,
+                patch("themis.pipeline.download_minecraft_chats", return_value=minecraft) as first,
+                patch("themis.pipeline.download_2b2t_chats", return_value=two_b_two_t) as second,
+                patch("themis.pipeline.moderate_dataset") as moderate,
+                patch("themis.pipeline.guided_sample_dataset") as sample,
             ):
                 self.assertIsNone(pipeline())
                 moderate.assert_called_once_with(
@@ -272,11 +272,11 @@ class CombinedPipelineTests(unittest.TestCase):
             contents = '{"content":"cached","moderation":{"OK":1.0}}\n'
             destination.write_text(contents)
             with (
-                patch("distill_jev.pipeline.download_minecraft_chats") as first,
-                patch("distill_jev.pipeline.download_2b2t_chats") as second,
-                patch("distill_jev.pipeline.deduplicate_chats") as deduplicate,
-                patch("distill_jev.pipeline.moderate_dataset") as moderate,
-                patch("distill_jev.pipeline.guided_sample_dataset") as sample,
+                patch("themis.pipeline.download_minecraft_chats") as first,
+                patch("themis.pipeline.download_2b2t_chats") as second,
+                patch("themis.pipeline.deduplicate_chats") as deduplicate,
+                patch("themis.pipeline.moderate_dataset") as moderate,
+                patch("themis.pipeline.guided_sample_dataset") as sample,
             ):
                 self.assertIsNone(pipeline())
                 first.assert_not_called()
@@ -292,10 +292,10 @@ class CombinedPipelineTests(unittest.TestCase):
             source.parent.mkdir()
             source.write_text('{"content":"cached"}\n')
             with (
-                patch("distill_jev.pipeline.download_minecraft_chats") as download,
-                patch("distill_jev.pipeline.deduplicate_chats") as deduplicate,
-                patch("distill_jev.pipeline.moderate_dataset") as moderate,
-                patch("distill_jev.pipeline.guided_sample_dataset") as sample,
+                patch("themis.pipeline.download_minecraft_chats") as download,
+                patch("themis.pipeline.deduplicate_chats") as deduplicate,
+                patch("themis.pipeline.moderate_dataset") as moderate,
+                patch("themis.pipeline.guided_sample_dataset") as sample,
             ):
                 self.assertIsNone(pipeline())
                 download.assert_not_called()
@@ -308,15 +308,15 @@ class CombinedPipelineTests(unittest.TestCase):
             source = Path("cache/combined_chats_deduplicated.jsonl")
             source.parent.mkdir()
             source.write_text('{"content":"cached"}\n')
-            with (patch("distill_jev.pipeline.moderate_dataset", side_effect=RuntimeError("failed")),
-                  patch("distill_jev.pipeline.guided_sample_dataset") as sample):
+            with (patch("themis.pipeline.moderate_dataset", side_effect=RuntimeError("failed")),
+                  patch("themis.pipeline.guided_sample_dataset") as sample):
                 with self.assertRaises(RuntimeError):
                     pipeline()
                 sample.assert_not_called()
 
     def test_approved_sample_quotas(self):
-        with (patch("distill_jev.pipeline.Path.is_file", return_value=True),
-              patch("distill_jev.pipeline.guided_sample_dataset") as sample):
+        with (patch("themis.pipeline.Path.is_file", return_value=True),
+              patch("themis.pipeline.guided_sample_dataset") as sample):
             pipeline()
             self.assertEqual(sum(sample.call_args.kwargs["quotas"].values()), 100_000)
 
@@ -328,14 +328,14 @@ class CombinedPipelineTests(unittest.TestCase):
                 '{"content":"one","moderation":{"A":0.7,"B":0.3}}\n'
                 '{"content":"two","moderation":{"A":0.6,"B":0.4}}\n'
             )
-            from distill_jev.datasets.sampling import guided_sample_dataset
+            from themis.datasets.sampling import guided_sample_dataset
 
             def sample_small(source, destination, quotas, **options):
                 return guided_sample_dataset(source, destination, {"A": 1}, **options)
 
-            with (patch("distill_jev.pipeline.guided_sample_dataset", side_effect=sample_small),
-                  patch("distill_jev.pipeline.download_minecraft_chats") as download,
-                  patch("distill_jev.pipeline.moderate_dataset") as moderate):
+            with (patch("themis.pipeline.guided_sample_dataset", side_effect=sample_small),
+                  patch("themis.pipeline.download_minecraft_chats") as download,
+                  patch("themis.pipeline.moderate_dataset") as moderate):
                 self.assertIsNone(pipeline())
                 output = Path("cache/combined_chats_inference_sample_100k.jsonl")
                 self.assertEqual(len(output.read_text().splitlines()), 1)
@@ -351,7 +351,7 @@ class CombinedPipelineTests(unittest.TestCase):
             source = Path("cache/combined_chats_moderated.jsonl")
             source.parent.mkdir()
             source.write_text('{"content":"cached","moderation":{"OK":1.0}}\n')
-            with (patch("distill_jev.pipeline.guided_sample_dataset") as sample,
+            with (patch("themis.pipeline.guided_sample_dataset") as sample,
                   patch("builtins.print") as output):
                 self.assertIsNone(pipeline())
                 output.assert_called_with("Pipeline complete.", flush=True)

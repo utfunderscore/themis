@@ -5,7 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from distill_jev.datasets.sampling import guided_sample_dataset
+from themis.datasets.sampling import guided_sample_dataset
 
 
 class GuidedSamplingTests(unittest.TestCase):
@@ -174,7 +174,7 @@ class GuidedSamplingTests(unittest.TestCase):
             self.assertEqual(selected["sampling"], "preserved")
             self.assertEqual(selected["selection"]["content_characters"], 1)
             other = Path(directory) / "failed.jsonl"
-            from distill_jev.datasets import sampling
+            from themis.datasets import sampling
             original_link = sampling.os.link
             calls = []
 

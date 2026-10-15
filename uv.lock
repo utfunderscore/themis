@@ -2,18 +2,18 @@ version = 1
 revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
-    "python_full_version >= '3.14' and extra != 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda'",
-    "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda'",
-    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda'",
-    "python_full_version >= '3.14' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda'",
-    "python_full_version < '3.14' and extra != 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda'",
-    "python_full_version < '3.14' and sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda'",
-    "python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda'",
-    "python_full_version < '3.14' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda'",
+    "python_full_version >= '3.14' and extra != 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda'",
+    "python_full_version >= '3.14' and sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda'",
+    "python_full_version >= '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda'",
+    "python_full_version >= '3.14' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda'",
+    "python_full_version < '3.14' and extra != 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda'",
+    "python_full_version < '3.14' and sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda'",
+    "python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda'",
+    "python_full_version < '3.14' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda'",
 ]
 conflicts = [[
-    { package = "distill-jev", extra = "cpu" },
-    { package = "distill-jev", extra = "cuda" },
+    { package = "themis", extra = "cpu" },
+    { package = "themis", extra = "cuda" },
 ]]
 
 [[package]]
@@ -27,10 +27,10 @@ dependencies = [
     { name = "psutil" },
     { name = "pyyaml" },
     { name = "safetensors" },
-    { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-11-distill-jev-cuda'" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-11-themis-cuda'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f5/b5/1d3ed029ac71d3f2961346829a268da923698e9fd63f218f78841f216bfd/accelerate-1.15.0.tar.gz", hash = "sha256:5654f8c5eaa0d4fa68b33e287a97765da6849bf6d51dcac874e73fbbddfb6134", size = 422615, upload-time = "2026-09-09T13:04:49.078Z" }
 wheels = [
@@ -187,7 +187,7 @@ version = "4.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz", hash = "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94", size = 276966, upload-time = "2026-09-05T10:42:39.44Z" }
 wheels = [
@@ -406,7 +406,7 @@ wheels = [
 ]
 
 [[package]]
-name = "distill-jev"
+name = "themis"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -416,8 +416,8 @@ dependencies = [
 
 [package.optional-dependencies]
 cpu = [
-    { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
 ]
 cuda = [
     { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
@@ -431,10 +431,10 @@ training = [
     { name = "numpy" },
     { name = "protobuf" },
     { name = "sentencepiece" },
-    { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-11-distill-jev-cuda'" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "torch", version = "2.8.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-11-themis-cuda'" },
     { name = "transformers" },
 ]
 
@@ -453,8 +453,8 @@ requires-dist = [
     { name = "polars", specifier = ">=2.0.0" },
     { name = "protobuf", marker = "extra == 'training'", specifier = ">=5,<8" },
     { name = "sentencepiece", marker = "extra == 'training'", specifier = ">=0.2,<0.3" },
-    { name = "torch", marker = "extra == 'cpu'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "distill-jev", extra = "cpu" } },
-    { name = "torch", marker = "extra == 'cuda'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "distill-jev", extra = "cuda" } },
+    { name = "torch", marker = "extra == 'cpu'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "themis", extra = "cpu" } },
+    { name = "torch", marker = "extra == 'cuda'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "themis", extra = "cuda" } },
     { name = "torch", marker = "extra == 'training'", specifier = "==2.8.0" },
     { name = "transformers", marker = "extra == 'training'", specifier = "==4.57.1" },
 ]
@@ -628,7 +628,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
+    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
     { name = "packaging" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -1108,7 +1108,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.10.2.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/41/e79269ce215c857c935fd86bcfe91a451a584dfc27f1e068f568b9ad1ab7/nvidia_cudnn_cu12-9.10.2.21-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c9132cc3f8958447b4910a1720036d9eff5928cc3179b0a51fb6d167c6cc87d8", size = 705026878, upload-time = "2025-06-06T21:52:51.348Z" },
@@ -1121,7 +1121,7 @@ name = "nvidia-cufft-cu12"
 version = "11.3.3.83"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/60/bc/7771846d3a0272026c416fbb7e5f4c1f146d6d80704534d0b187dd6f4800/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:848ef7224d6305cdb2a4df928759dca7b1201874787083b6e7550dd6765ce69a", size = 193109211, upload-time = "2025-03-07T01:44:56.873Z" },
@@ -1153,9 +1153,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.3.90"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
-    { name = "nvidia-cusparse-cu12", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
-    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
+    { name = "nvidia-cusparse-cu12", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/32/f7cd6ce8a7690544d084ea21c26e910a97e077c9b7f07bf5de623ee19981/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:db9ed69dbef9715071232caa9b69c52ac7de3a95773c2db65bdba85916e4e5c0", size = 267229841, upload-time = "2025-03-07T01:46:54.356Z" },
@@ -1168,7 +1168,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.8.93"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/f7/cd777c4109681367721b00a106f491e0d0d15cfa1fd59672ce580ce42a97/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9b6c161cb130be1a07a27ea6923df8141f3c295852f4b260c65f18f3e0a091dc", size = 288117129, upload-time = "2025-03-07T01:47:40.407Z" },
@@ -1739,13 +1739,13 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform == 'darwin'",
 ]
 dependencies = [
-    { name = "filelock", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "fsspec", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "jinja2", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "networkx", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "setuptools", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "sympy", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "typing-extensions", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-distill-jev-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
+    { name = "filelock", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "fsspec", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "jinja2", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "networkx", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "setuptools", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "sympy", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "typing-extensions", marker = "(python_full_version < '3.14' and sys_platform == 'darwin' and extra == 'extra-11-themis-cpu') or (python_full_version >= '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.8.0-cp313-cp313t-macosx_14_0_arm64.whl", hash = "sha256:fbe2e149c5174ef90d29a5f84a554dfaf28e003cb4f61fa2c8c024c17ec7ca58", upload-time = "2025-10-01T23:35:52Z" },
@@ -1761,28 +1761,28 @@ resolution-markers = [
     "python_full_version < '3.14'",
 ]
 dependencies = [
-    { name = "filelock", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "fsspec", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "jinja2", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "networkx", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "setuptools", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "sympy", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
-    { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda') or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "typing-extensions", marker = "(extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (extra != 'extra-11-distill-jev-cpu' and extra != 'extra-11-distill-jev-cuda')" },
+    { name = "filelock", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "fsspec", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "jinja2", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "networkx", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "setuptools", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "sympy", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
+    { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda') or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "typing-extensions", marker = "(extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (extra != 'extra-11-themis-cpu' and extra != 'extra-11-themis-cuda')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/4e/469ced5a0603245d6a19a556e9053300033f9c5baccf43a3d25ba73e189e/torch-2.8.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:2b2f96814e0345f5a5aed9bf9734efa913678ed19caf6dc2cddb7930672d6128", size = 101936856, upload-time = "2025-08-06T14:54:01.526Z" },
@@ -1805,13 +1805,13 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'darwin'",
 ]
 dependencies = [
-    { name = "filelock", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "fsspec", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "jinja2", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "networkx", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "setuptools", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "sympy", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
-    { name = "typing-extensions", marker = "(python_full_version >= '3.14' and extra == 'extra-11-distill-jev-cpu') or (python_full_version < '3.14' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-distill-jev-cpu')" },
+    { name = "filelock", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "fsspec", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "jinja2", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "networkx", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "setuptools", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "sympy", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
+    { name = "typing-extensions", marker = "(python_full_version >= '3.14' and extra == 'extra-11-themis-cpu') or (python_full_version < '3.14' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'darwin' and extra == 'extra-11-themis-cpu')" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cpu/torch-2.8.0%2Bcpu-cp313-cp313-linux_s390x.whl", hash = "sha256:8b5882276633cf91fe3d2d7246c743b94d44a7e660b27f1308007fdb1bb89f7d", upload-time = "2025-10-01T23:34:15Z" },
@@ -1833,28 +1833,28 @@ resolution-markers = [
     "python_full_version < '3.14'",
 ]
 dependencies = [
-    { name = "filelock", marker = "extra == 'extra-11-distill-jev-cuda'" },
-    { name = "fsspec", marker = "extra == 'extra-11-distill-jev-cuda'" },
-    { name = "jinja2", marker = "extra == 'extra-11-distill-jev-cuda'" },
-    { name = "networkx", marker = "extra == 'extra-11-distill-jev-cuda'" },
-    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "setuptools", marker = "extra == 'extra-11-distill-jev-cuda'" },
-    { name = "sympy", marker = "extra == 'extra-11-distill-jev-cuda'" },
-    { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-distill-jev-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda') or (sys_platform != 'linux' and extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
-    { name = "typing-extensions", marker = "extra == 'extra-11-distill-jev-cuda'" },
+    { name = "filelock", marker = "extra == 'extra-11-themis-cuda'" },
+    { name = "fsspec", marker = "extra == 'extra-11-themis-cuda'" },
+    { name = "jinja2", marker = "extra == 'extra-11-themis-cuda'" },
+    { name = "networkx", marker = "extra == 'extra-11-themis-cuda'" },
+    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "setuptools", marker = "extra == 'extra-11-themis-cuda'" },
+    { name = "sympy", marker = "extra == 'extra-11-themis-cuda'" },
+    { name = "triton", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-11-themis-cuda') or (platform_machine != 'x86_64' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda') or (sys_platform != 'linux' and extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
+    { name = "typing-extensions", marker = "extra == 'extra-11-themis-cuda'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:3a852369a38dec343d45ecd0bc3660f79b88a23e0c878d18707f7c13bf49538f", upload-time = "2025-10-01T23:52:56Z" },
@@ -1868,7 +1868,7 @@ name = "tqdm"
 version = "4.70.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-distill-jev-cpu' and extra == 'extra-11-distill-jev-cuda')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-themis-cpu' and extra == 'extra-11-themis-cuda')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846, upload-time = "2026-09-11T07:25:16.601Z" }
 wheels = [
@@ -1901,7 +1901,7 @@ name = "triton"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools", marker = "extra == 'extra-11-distill-jev-cuda' or extra != 'extra-11-distill-jev-cpu'" },
+    { name = "setuptools", marker = "extra == 'extra-11-themis-cuda' or extra != 'extra-11-themis-cpu'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/30/7b/0a685684ed5322d2af0bddefed7906674f67974aa88b0fae6e82e3b766f6/triton-3.4.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:00be2964616f4c619193cb0d1b29a99bd4b001d7dc333816073f92cf2a8ccdeb", size = 155569223, upload-time = "2025-07-30T19:58:44.017Z" },

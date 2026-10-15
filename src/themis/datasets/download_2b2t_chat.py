@@ -36,7 +36,7 @@ def download(output_path: Path = Path("/cache/chats.csv"), force: bool = False) 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="2b2t-", dir=output_path.parent) as directory:
         archive_path = Path(directory) / "dataset.zip"
-        request = Request(DATASET_URL, headers={"User-Agent": "distill-jev/0.1 (dataset downloader)"})
+        request = Request(DATASET_URL, headers={"User-Agent": "themis/0.1 (dataset downloader)"})
         with urlopen(request, timeout=60) as response, archive_path.open("wb") as archive:
             shutil.copyfileobj(response, archive, length=1024 * 1024)
 

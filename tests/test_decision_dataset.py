@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from distill_jev.models.decision.perplexity.dataset import (
+from themis.models.decision.perplexity.dataset import (
     dataset_manifest,
     prepare_dataset,
     split_dataset,
@@ -83,5 +83,5 @@ class DatasetTests(unittest.TestCase):
         for checksum, count in (("different", 1), ("checksum", 2)):
             self.assertNotEqual(baseline, dataset_manifest(checksum, count))
         for name in ("MODEL_REVISION", "PIPELINE_VERSION", "NUMERICAL_POLICY", "PROCESSING_WINDOW"):
-            with patch(f"distill_jev.models.decision.perplexity.dataset.{name}", "changed"):
+            with patch(f"themis.models.decision.perplexity.dataset.{name}", "changed"):
                 self.assertNotEqual(baseline, dataset_manifest("checksum", 1))

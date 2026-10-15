@@ -11,8 +11,8 @@ if HAS_TRAINING:
     import torch
     from transformers import BertTokenizer, DebertaV2Config, DebertaV2ForSequenceClassification
 
-    from distill_jev.models.deberta import ACTION_LABELS, LABELS
-    from distill_jev.models.deberta.inference import Moderation
+    from themis.models.deberta import ACTION_LABELS, LABELS
+    from themis.models.deberta.inference import Moderation
 
 
 @unittest.skipUnless(HAS_TRAINING, "Install the training extra to run inference tests")

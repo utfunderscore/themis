@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from distill_jev.file_cache import FileCache, file_cache
+from themis.file_cache import FileCache, file_cache
 
 
 class FileCacheTests(unittest.TestCase):

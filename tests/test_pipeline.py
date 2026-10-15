@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import polars as pl
 
-from distill_jev.datasets.deduplication import deduplicate_chats
+from themis.datasets.deduplication import deduplicate_chats
 
 
 class DeduplicationTests(unittest.TestCase):

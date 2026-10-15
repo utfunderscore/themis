@@ -4,8 +4,8 @@ from pathlib import Path
 
 import polars as pl
 
-from distill_jev.datasets.download_2b2t_chat import load as load_2b2t
-from distill_jev.datasets.download_minecraft_server_chat import load as load_minecraft
+from themis.datasets.download_2b2t_chat import load as load_2b2t
+from themis.datasets.download_minecraft_server_chat import load as load_minecraft
 
 
 class DatasetLoadingTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-# distill-jev
+# themis
 
 Dataset preparation and moderation inference. See [DeBERTa training](docs/deberta-training.md) for CPU and CUDA training instructions.
 
@@ -13,7 +13,7 @@ reuse completed output or resume checkpointed shards after a failure.
 To prepare review inputs directly from existing predictions without running inference:
 
 ```python
-from distill_jev.pipeline import generate_review_dataset
+from themis.pipeline import generate_review_dataset
 
 generate_review_dataset(
     source="cache/combined_chats_inference_sample_100k_decisions.jsonl",

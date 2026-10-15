@@ -6,9 +6,9 @@ from uuid import uuid4
 import modal
 
 
-VOLUME_NAME = "distill-jev-deberta-training"
+VOLUME_NAME = "themis-deberta-training"
 ROOT = Path("/training")
-app = modal.App("distill-jev-deberta-training")
+app = modal.App("themis-deberta-training")
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 image = (
     modal.Image.debian_slim(python_version="3.13")
@@ -18,7 +18,7 @@ image = (
         "sentencepiece>=0.2,<0.3", "protobuf>=5,<8",
     )
     .env({"HF_HOME": "/training/huggingface"})
-    .add_local_python_source("distill_jev")
+    .add_local_python_source("themis")
 )
 
 
