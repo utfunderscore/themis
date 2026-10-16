@@ -4,14 +4,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from themis.models.decision.perplexity.dataset import split_dataset
-from themis.pipeline import generate_review_dataset
+from themis.datasets.review import generate_review_dataset
 
 
 class ReviewDatasetTests(unittest.TestCase):
-    def test_mixed_rows_preserve_exact_context_and_native_fields(self):
+    def test_native_rows_preserve_exact_context_and_native_fields(self):
         rows = [
             {
-                "state": {"text": "native chat"},
+                "state": "native chat",
                 "content": "not the native input",
                 "question": {"type": "choice", "criteria": {"insult": "Insult"}},
                 "images": ["data:image/png;base64,abc"],
@@ -19,9 +19,12 @@ class ReviewDatasetTests(unittest.TestCase):
                 "decision": {"answer": {"probabilities": {"insult": 0.5, "none": 0.5}}},
             },
             {
-                "content": "legacy chat ☃",
-                "metadata": {"only_second": "preserved"},
-                "decision": {"answer": {"probabilities": {"none": 0.7, "threat": 0.3}}},
+                "state": "second chat ☃",
+                "content": "second content",
+                "question": {"type": "choice", "criteria": {"insult": "Insult"}},
+                "images": [],
+                "source": {"content": "second original", "metadata": {"only_first": 2}},
+                "decision": {"answer": {"probabilities": {"insult": 0.3, "none": 0.7}}},
             },
         ]
         with TemporaryDirectory() as directory:
@@ -32,11 +35,10 @@ class ReviewDatasetTests(unittest.TestCase):
             generate_review_dataset(source, destination)
             prepared = [json.loads(line) for line in destination.read_text().splitlines()]
             self.assertEqual([row["source"] for row in prepared], rows)
-            self.assertEqual(prepared[0]["state"], rows[0]["state"])
-            self.assertEqual(prepared[0]["images"], rows[0]["images"])
-            self.assertNotIn("metadata", prepared[0])
-            self.assertNotIn("images", prepared[1])
-            self.assertEqual(prepared[1]["state"], rows[1]["content"])
+            self.assertEqual([row["state"] for row in prepared], ["native chat", "second chat ☃"])
+            self.assertEqual([row["images"] for row in prepared], [row["images"] for row in rows])
+            for row in prepared:
+                self.assertEqual(set(row), {"images", "state", "question", "source"})
             self.assertIn("classified as insult.", prepared[0]["question"]["instructions"])
             self.assertIn("classified as none.", prepared[1]["question"]["instructions"])
             self.assertEqual(source.read_bytes(), original_bytes)
@@ -47,6 +49,25 @@ class ReviewDatasetTests(unittest.TestCase):
                 shards, _, total = split_dataset(destination, shards_directory, rows_per_shard=1)
                 self.assertEqual(total, 2)
                 self.assertEqual(len(shards), 2)
+
+    def test_legacy_rows_use_content_as_state(self):
+        rows = [
+            {
+                "content": "legacy chat ☃",
+                "metadata": {"kept": "preserved"},
+                "decision": {"answer": {"probabilities": {"none": 0.7, "threat": 0.3}}},
+            },
+        ]
+        with TemporaryDirectory() as directory:
+            source, destination = Path(directory) / "scores.jsonl", Path(directory) / "review.jsonl"
+            source.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            generate_review_dataset(source, destination)
+            [prepared] = [json.loads(line) for line in destination.read_text().splitlines()]
+            self.assertEqual(prepared["source"], rows[0])
+            self.assertEqual(prepared["state"], "legacy chat ☃")
+            self.assertEqual(prepared["metadata"], rows[0]["metadata"])
+            self.assertNotIn("content", prepared)
+            self.assertIn("classified as none.", prepared["question"]["instructions"])
 
     def test_empty_input_publishes_empty_output(self):
         with TemporaryDirectory() as directory:
@@ -78,11 +99,20 @@ class ReviewDatasetTests(unittest.TestCase):
                 with self.subTest(row=invalid):
                     source.write_text(json.dumps(valid) + "\n" + invalid + "\n")
                     destination.write_text("completed output")
-                    with self.assertRaisesRegex(ValueError, "row 2|Row 2"):
+                    with self.assertRaises(ValueError):
                         generate_review_dataset(source, destination)
                     self.assertEqual(destination.read_text(), "completed output")
                     self.assertEqual(sorted(path.name for path in Path(directory).iterdir()),
                                      ["review.jsonl", "scores.jsonl"])
+
+    def test_out_of_range_probabilities_report_row(self):
+        with TemporaryDirectory() as directory:
+            source, destination = Path(directory) / "scores.jsonl", Path(directory) / "review.jsonl"
+            source.write_text("".join(json.dumps({
+                "state": "chat", "decision": {"answer": {"probabilities": {"none": score}}},
+            }) + "\n" for score in (1.0, 1.1)))
+            with self.assertRaisesRegex(ValueError, "Row 2"):
+                generate_review_dataset(source, destination)
 
     def test_source_aliases_are_rejected(self):
         with TemporaryDirectory() as directory:

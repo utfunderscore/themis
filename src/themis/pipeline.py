@@ -1,7 +1,4 @@
-import json
-from math import isfinite
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import polars as pl
 
@@ -10,6 +7,7 @@ from themis.datasets.download_2b2t_chat import download as download_2b2t_chats
 from themis.datasets.download_minecraft_server_chat import (
     download as download_minecraft_chats,
 )
+from themis.datasets.review import generate_review_dataset
 from themis.datasets.sampling import guided_sample_dataset
 from themis.models.deberta.workflow import train_and_export
 from themis.models.decision.perplexity.bulk import predict_dataset
@@ -97,88 +95,6 @@ def pipeline():
         onnx_output_directory=None,
     )
     print("Pipeline complete.", flush=True)
-
-
-def generate_review_dataset(source: str | Path, destination: str | Path) -> Path:
-    """Prepare second-pass native rows from category-scored chat JSONL.
-
-    Accept prepared rows with ``state`` or legacy results with ``content``.
-    Select the highest-probability category from the native answer and preserve
-    the full first-pass record under ``source``. Ties use probability insertion
-    order. Stream rows without altering metadata or running additional inference;
-    publish the destination atomically only after all rows are valid.
-    """
-    source, destination = Path(source), Path(destination)
-    if source.resolve() == destination.resolve() or (
-        destination.exists() and source.samefile(destination)
-    ):
-        raise ValueError("source and destination must differ")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(
-        prefix="prepare-review-", dir=destination.parent
-    ) as temporary:
-        prepared = Path(temporary) / "prepared.jsonl"
-        with source.open("rb") as reader, prepared.open("wb") as writer:
-            for number, line in enumerate(reader, 1):
-                try:
-                    record = json.loads(line)
-                except (ValueError, UnicodeDecodeError) as exc:
-                    raise ValueError(f"Invalid JSON on row {number}") from exc
-                if not isinstance(record, dict):
-                    raise ValueError(f"Row {number} must be an object")
-                if "state" in record:
-                    state = record["state"]
-                    if state is None:
-                        raise ValueError(f"Row {number} must have a non-null state")
-                else:
-                    state = record.get("content")
-                    if not isinstance(state, str):
-                        raise ValueError(f"Row {number} must have state or string content")
-                try:
-                    probabilities = record["decision"]["answer"]["probabilities"]
-                except (KeyError, TypeError) as exc:
-                    raise ValueError(f"Row {number} must have category probabilities") from exc
-                if not isinstance(probabilities, dict) or not probabilities or any(
-                    not isinstance(label, str) or not label
-                    or isinstance(score, bool) or not isinstance(score, (int, float))
-                    or not 0 <= score <= 1 or not isfinite(score)
-                    for label, score in probabilities.items()
-                ):
-                    raise ValueError(f"Row {number} must have finite category probabilities in [0, 1]")
-                category = max(probabilities, key=probabilities.__getitem__)
-                question = {
-                    "type": "choice",
-                    "instructions": (
-                        f"This message has been classified as {category}. "
-                        "Consider it in the context of a video game involving combat, "
-                        "friendly insults, and fictional violence. The previous classification "
-                        "is a preliminary assessment, not a final decision.\n\n"
-                        "Is the message suitable to allow, or should it be blocked for human "
-                        "review? Distinguish ordinary gameplay discussion, fictional threats, "
-                        "and friendly banter from targeted abuse, hate speech, credible "
-                        "real-world threats, or other harmful content. Do not assume an insult "
-                        "is friendly solely because it occurs in a game."
-                    ),
-                    "criteria": {
-                        "allow": "Suitable in this context; no review needed.",
-                        "block_and_review": (
-                            "Potentially harmful beyond ordinary gameplay or friendly banter; "
-                            "block for human review."
-                        ),
-                    },
-                }
-                row = {
-                    name: value for name, value in record.items()
-                    if name not in {"state", "question", "decision", "source", "content"}
-                }
-                row.update(state=state, question=question, source=record)
-                try:
-                    payload = (json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
-                except (TypeError, ValueError) as exc:
-                    raise ValueError(f"Invalid JSON on row {number}") from exc
-                writer.write(payload)
-        prepared.replace(destination)
-    return destination
 
 
 def main() -> None:
