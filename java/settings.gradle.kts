@@ -7,3 +7,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "themis-inference"
 include("inference-onnx")
+include("inference-cli")
