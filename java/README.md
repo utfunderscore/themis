@@ -6,6 +6,7 @@ DeBERTa ONNX model.
 ## Module
 
 - `inference-onnx`: inference implementation using the CPU ONNX Runtime Java library.
+- `inference-cli`: simple command-line app that moderates text lines from stdin.
 
 Source packages use `lol.utf.themis`. `inference-onnx` is a Gradle subproject,
 not a JPMS module.
@@ -49,6 +50,18 @@ Tokenization is a pure-Java port of the slow `DebertaV2Tokenizer` (SentencePiece
 unigram with `nmt_nfkc` normalization and byte fallback). Texts are truncated to
 the bundle's `max_length`. Loading validates `inference_config.json` against the
 labels, tokenizer settings and postprocessing implemented here.
+
+## CLI
+
+`inference-cli` reads one text per line from stdin and moderates each in FIFO
+order (`Scheduling.fifo()`, one text per model call), printing
+`action<TAB>category<TAB>category-probability<TAB>text`. Blank lines are skipped;
+a failing line is reported on stderr and makes the exit code 1.
+
+```sh
+./gradlew :inference-cli:run --args=/path/to/bundle   # type texts, Ctrl-D to finish
+./gradlew :inference-cli:installDist                  # then: inference-cli/build/install/inference-cli/bin/inference-cli /path/to/bundle
+```
 
 ## Build
 
