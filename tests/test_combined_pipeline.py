@@ -8,7 +8,8 @@ from unittest.mock import call, patch
 import polars as pl
 
 from themis.datasets.deduplication import deduplicate_chats
-from themis.pipeline import generate_review_dataset, pipeline
+from themis.datasets.review import generate_review_dataset
+from themis.pipeline import pipeline
 
 
 class CombinedPipelineTests(unittest.TestCase):

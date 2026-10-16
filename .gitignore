@@ -5,3 +5,4 @@ cache/
 2b2t-dataset/
 java/.gradle/
 java/**/build/
+java/**/bin/

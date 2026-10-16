@@ -1,5 +1,11 @@
 [versions]
 onnxruntime = "1.31.0"
+junit = "6.0.0"
+gson = "2.14.0"
 
 [libraries]
 onnxruntime = { module = "com.microsoft.onnxruntime:onnxruntime", version.ref = "onnxruntime" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
