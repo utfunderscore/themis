@@ -13,17 +13,22 @@ the library at it, then give it text:
 import java.nio.file.Path;
 import lol.utf.themis.onnx.*;
 
-try (Moderator moderator = Moderator.load(Path.of("/path/to/model-folder"))) {
+try (Moderator moderator = Moderator.load(Path.of("/path/to/model-folder")).join()) {
 
-    Moderation result = moderator.moderate("hello world");
+    Moderation result = moderator.moderate("hello world").join();
 
     System.out.println(result.category()); // NONE
     System.out.println(result.action());   // ALLOW
 }
 ```
 
-That's all you need for most uses. The `try (...)` part makes sure the model is
-shut down properly when you're done.
+Nothing in the library throws. Loading and moderating both return a
+`CompletableFuture`, which is Java's way of saying "the answer will arrive
+later". Any problem (a missing model folder, a closed moderator, a failing
+model) comes out through that future instead. The examples use `.join()` to wait
+for the answer; see "When things go wrong" for what it throws.
+
+The `try (...)` part makes sure the model is shut down properly when you're done.
 
 ## Reading the result
 
@@ -56,28 +61,27 @@ if (result.action() == Action.BLOCK_AND_REVIEW) {
 ## Checking many messages
 
 ```java
-List<Moderation> results = moderator.moderateAll(List.of("first", "second", "third"));
+List<Moderation> results = moderator.moderateAll(List.of("first", "second", "third")).join();
 ```
 
 The results come back in the same order as the messages you gave.
 
-## If you're using several threads
+## Not waiting for the answer
 
-It's safe to call the same `Moderator` from many threads at once. Create one
-and share it rather than making a new one each time (loading is slow).
-
-If you don't want your code to wait for the answer, use `submit` instead of
-`moderate`. It returns right away with a `CompletableFuture`, which is Java's
-way of saying "the answer will arrive later":
+Instead of `.join()`, attach what should happen next:
 
 ```java
-moderator.submit("some text").thenAccept(result -> {
+moderator.moderate("some text").thenAccept(result -> {
     System.out.println(result.action());
 });
 ```
 
-(Inside that callback, keep the work quick, and don't call `moderate` from
-it.)
+Keep that callback quick, and don't `.join()` on another request inside it. If
+you need to close the moderator from a callback, use `closeAsync()`, which
+returns a future and doesn't wait.
+
+It's safe to call the same `Moderator` from many threads at once. Create one
+and share it rather than making a new one each time (loading is slow).
 
 ## Speeding it up
 
@@ -85,7 +89,7 @@ By default each message is checked one at a time. If lots of messages arrive at
 once, let the library check several together:
 
 ```java
-Moderator moderator = Moderator.load(Path.of("/path/to/model-folder"), Scheduling.batched(16));
+Moderator moderator = Moderator.load(Path.of("/path/to/model-folder"), 16).join();
 ```
 
 `16` is the most messages it will check together. It never waits around to fill
@@ -93,7 +97,24 @@ a group, so this won't slow down quiet periods.
 
 ## When things go wrong
 
+Failures arrive through the future. `.join()` throws a `CompletionException`
+whose cause is the real problem, `.get()` throws an `ExecutionException`, and
+`.exceptionally(...)` / `.handle(...)` let you deal with it without throwing:
+
+```java
+moderator.moderate(text).exceptionally(failure -> { log(failure); return null; });
+```
+
+The cause is one of:
+
 - **`InferenceException`**: the model folder is missing or wrong, or the model
   failed while running.
-- **`RejectedExecutionException`**: you used the moderator after closing it, or
-  too many messages are waiting (the default limit is 1024).
+- **`RejectedExecutionException`**: you used the moderator after closing it.
+- **`NullPointerException` / `IllegalArgumentException`**: a null text, or a
+  batch size below 1.
+
+Separately, a **"waiting requests" warning in your logs** means messages
+are arriving faster than the model can check them (more than 1024 are waiting by
+default). Nothing is dropped, but results will lag and memory use grows until
+the backlog clears. Try a larger batch size, or change the threshold with the
+`THEMIS_QUEUE_WARNING_THRESHOLD` environment variable.

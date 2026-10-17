@@ -28,6 +28,7 @@ final class SentencePiece {
     static final int BYTE = 6;
 
     private static final float UNKNOWN_PENALTY = 10.0f;
+    private static final char SPACE_SYMBOL = '\u2581';
 
     record Piece(String piece, float score, int type) {
     }
@@ -39,6 +40,8 @@ final class SentencePiece {
     private final int unknownId;
     private final float unknownScore;
     private final int maxPieceLength;
+    /** Whether every space symbol starts a piece, so segmentation can stop there. */
+    private final boolean spaceStartsPiece;
 
     SentencePiece(List<Piece> pieces, SentencePieceNormalizer normalizer) {
         this.normalizer = normalizer;
@@ -47,6 +50,7 @@ final class SentencePiece {
         int unknown = -1;
         float minScore = Float.MAX_VALUE;
         int longest = 0;
+        boolean spaceOnlyLeading = true;
         for (int id = 0; id < pieces.size(); id++) {
             Piece piece = pieces.get(id);
             scores[id] = piece.score();
@@ -57,6 +61,7 @@ final class SentencePiece {
                     }
                     minScore = Math.min(minScore, piece.score());
                     longest = Math.max(longest, piece.piece().length());
+                    spaceOnlyLeading &= piece.piece().indexOf(SPACE_SYMBOL, 1) < 0;
                 }
                 case UNKNOWN -> unknown = id;
                 case BYTE -> byteIds[parseByte(piece.piece())] = id;
@@ -77,6 +82,7 @@ final class SentencePiece {
         this.unknownId = unknown;
         this.unknownScore = minScore - UNKNOWN_PENALTY;
         this.maxPieceLength = longest;
+        this.spaceStartsPiece = spaceOnlyLeading;
     }
 
     /** Loads a unigram {@code .model} file trained with byte fallback. */
@@ -108,6 +114,21 @@ final class SentencePiece {
 
     /** Encodes text to piece ids, without special tokens. */
     int[] encode(String text) {
+        return encode(text, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Encodes text to piece ids, without special tokens, stopping once at least
+     * {@code minTokens} ids are known. The result is always a prefix of
+     * {@link #encode(String)} with at least {@code min(minTokens, total)} ids.
+     *
+     * <p>When no piece contains the space symbol after its first character, every
+     * space symbol in the normalized text is a boundary of every segmentation.
+     * The Viterbi scores up to a boundary do not depend on later text, so the
+     * best path to the first boundary with enough ids is exactly the prefix of
+     * the full best path, and the rest of the text can be skipped.
+     */
+    int[] encode(String text, int minTokens) {
         String normalized = normalizer.normalize(text);
         int length = normalized.length();
         if (length == 0) {
@@ -116,10 +137,20 @@ final class SentencePiece {
         float[] bestScore = new float[length + 1];
         int[] bestStart = new int[length + 1];
         int[] bestId = new int[length + 1];
+        int[] tokenCount = new int[length + 1];
         Arrays.fill(bestStart, -1);
 
+        int stop = length;
         for (int start = 0; start < length; ) {
             int charLength = Character.charCount(normalized.codePointAt(start));
+            if (start > 0) {
+                // Every piece ending here has been scored, so the path to start is final.
+                tokenCount[start] = tokenCount[bestStart[start]] + idCount(normalized, bestStart[start], bestId[start]);
+                if (spaceStartsPiece && tokenCount[start] >= minTokens && normalized.charAt(start) == SPACE_SYMBOL) {
+                    stop = start;
+                    break;
+                }
+            }
             float scoreSoFar = bestScore[start];
             boolean hasSingleCharacter = false;
             int lastEnd = Math.min(length, start + maxPieceLength);
@@ -151,10 +182,10 @@ final class SentencePiece {
         }
 
         List<int[]> path = new ArrayList<>();
-        for (int end = length; end > 0; end = bestStart[end]) {
+        for (int end = stop; end > 0; end = bestStart[end]) {
             path.add(new int[] {bestStart[end], end, bestId[end]});
         }
-        int[] ids = new int[length * 3];
+        int[] ids = new int[stop * 3];
         int count = 0;
         for (int i = path.size() - 1; i >= 0; i--) {
             int[] node = path.get(i);
@@ -168,6 +199,15 @@ final class SentencePiece {
             }
         }
         return Arrays.copyOf(ids, count);
+    }
+
+    /** Number of ids the piece starting at {@code start} produces, counting byte fallback. */
+    private int idCount(String normalized, int start, int id) {
+        if (id != unknownId) {
+            return 1;
+        }
+        int end = start + Character.charCount(normalized.codePointAt(start));
+        return normalized.substring(start, end).getBytes(StandardCharsets.UTF_8).length;
     }
 
     private static SentencePieceNormalizer readNormalizer(NormalizerSpec spec) {

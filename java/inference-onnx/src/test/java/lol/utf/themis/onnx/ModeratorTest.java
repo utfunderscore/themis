@@ -19,11 +19,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -53,7 +52,7 @@ class ModeratorTest {
         assumeTrue(property != null && !property.isBlank(), "themis.onnx.bundle not set");
         bundle = Path.of(property);
         tokenizer = ModelBundle.read(bundle).tokenizer();
-        moderator = Moderator.load(bundle, Scheduling.batched(8));
+        moderator = Moderator.load(bundle, 8).join();
     }
 
     @AfterAll
@@ -96,25 +95,25 @@ class ModeratorTest {
                 logits.add(floats(example.getAsJsonArray("logits").get(row).getAsJsonArray()));
             }
         }
-        List<Moderation> batched = moderator.moderateAll(texts);
+        List<Moderation> batched = moderator.moderateAll(texts).join();
         for (int i = 0; i < texts.size(); i++) {
             float[] row = logits.get(i);
             Moderation expected = Moderation.of(
                     Moderator.softmax(row, 0, Category.values().length),
                     Moderator.softmax(row, Category.values().length, Action.values().length));
             assertModeration(expected, batched.get(i));
-            assertModeration(expected, moderator.moderate(texts.get(i)));
+            assertModeration(expected, moderator.moderate(texts.get(i)).join());
         }
     }
 
     @Test
     void concurrentSubmissionsMatchSequentialResults() {
         List<String> texts = List.of("hello", "you are an idiot", "gg", "", "Hello 👋 café 世界", "nice base");
-        List<Moderation> expected = texts.stream().map(moderator::moderate).toList();
+        List<Moderation> expected = texts.stream().map(text -> moderator.moderate(text).join()).toList();
         List<CompletableFuture<Moderation>> futures = new ArrayList<>();
         for (int round = 0; round < 5; round++) {
             for (String text : texts) {
-                futures.add(CompletableFuture.supplyAsync(() -> moderator.moderate(text)));
+                futures.add(CompletableFuture.supplyAsync(() -> moderator.moderate(text)).thenCompose(f -> f));
             }
         }
         for (int i = 0; i < futures.size(); i++) {
@@ -123,17 +122,17 @@ class ModeratorTest {
     }
 
     @Test
-    void blockingFromInferenceThreadFailsInsteadOfDeadlocking() {
-        List<String> slow = Collections.nCopies(8, "hello ".repeat(300));
-        CompletableFuture<Moderation> nested = moderator.submitAll(slow)
-                .thenApply(ignored -> moderator.moderate("hello"));
-        CompletionException failure = assertThrows(CompletionException.class, nested::join);
-        assertInstanceOf(IllegalStateException.class, failure.getCause());
+    void invalidArgumentsFailTheFutureInsteadOfThrowing() {
+        assertFailsWith(NullPointerException.class, moderator.moderate(null));
+        assertFailsWith(NullPointerException.class, moderator.moderateAll(null));
+        assertFailsWith(NullPointerException.class, moderator.moderateAll(Arrays.asList("hello", null)));
+        assertFailsWith(IllegalArgumentException.class, Moderator.load(bundle, 0));
+        assertFailsWith(NullPointerException.class, Moderator.load(null));
     }
 
     @Test
     void probabilitiesFormDistributions() {
-        Moderation result = moderator.moderate("hello world");
+        Moderation result = moderator.moderate("hello world").join();
         assertEquals(1.0, result.categoryProbabilities().values().stream().mapToDouble(d -> d).sum(), 1e-9);
         assertEquals(1.0, result.actionProbabilities().values().stream().mapToDouble(d -> d).sum(), 1e-9);
     }
@@ -141,23 +140,24 @@ class ModeratorTest {
     @Test
     void rejectsIncompleteBundle(@TempDir Path directory) throws IOException {
         Files.copy(bundle.resolve("tokenizer_config.json"), directory.resolve("tokenizer_config.json"));
-        assertThrows(InferenceException.class, () -> Moderator.load(directory));
+        assertFailsWith(InferenceException.class, Moderator.load(directory));
         Files.writeString(directory.resolve("inference_config.json"),
                 Files.readString(bundle.resolve("inference_config.json")).replace("\"slur\"", "\"other\""));
-        InferenceException failure = assertThrows(InferenceException.class, () -> Moderator.load(directory));
+        Throwable failure = assertFailsWith(InferenceException.class, Moderator.load(directory));
         assertTrue(failure.getMessage().contains("labels"), failure.getMessage());
     }
 
     @Test
     void closedModeratorRejectsRequests() {
-        Moderator closed = Moderator.load(bundle);
+        Moderator closed = Moderator.load(bundle).join();
         closed.close();
-        assertThrows(RejectedExecutionException.class, () -> closed.moderate("hello"));
+        assertFailsWith(RejectedExecutionException.class, closed.moderate("hello"));
+        assertFailsWith(RejectedExecutionException.class, closed.moderateAll(List.of("hello")));
     }
 
     @Test
-    void closingFromInferenceThreadLeavesQueuedRequestsAndModeratorUsable() throws Exception {
-        try (Moderator local = Moderator.load(bundle)) {
+    void closingFromInferenceThreadDoesNotDeadlockAndFinishesQueuedRequests() throws Exception {
+        try (Moderator local = Moderator.load(bundle).join()) {
             Field executorField = Moderator.class.getDeclaredField("executor");
             executorField.setAccessible(true);
             InferenceExecutor executor = (InferenceExecutor) executorField.get(local);
@@ -170,7 +170,7 @@ class ModeratorTest {
             // Keep the worker from completing the request before the callback is attached.
             queueLock.lock();
             try {
-                callback = local.submit("hello").thenAccept(ignored -> {
+                callback = local.moderate("hello").thenAccept(ignored -> {
                     assertTrue(executor.isWorkerThread());
                     entered.countDown();
                     try {
@@ -179,7 +179,7 @@ class ModeratorTest {
                         Thread.currentThread().interrupt();
                         throw new AssertionError(e);
                     }
-                    assertThrows(IllegalStateException.class, local::close);
+                    local.close();
                 });
             } finally {
                 queueLock.unlock();
@@ -187,16 +187,20 @@ class ModeratorTest {
             CompletableFuture<Moderation> queued;
             try {
                 assertTrue(entered.await(30, TimeUnit.SECONDS), "callback did not start");
-                queued = local.submit("second message");
+                queued = local.moderate("second message");
             } finally {
                 release.countDown();
             }
             callback.get(30, TimeUnit.SECONDS);
-            Moderation result = queued.get(30, TimeUnit.SECONDS);
-            assertModeration(result, local.submit("second message").get(30, TimeUnit.SECONDS));
-            local.close();
-            assertThrows(RejectedExecutionException.class, () -> local.submit("after close"));
+            assertTrue(queued.get(30, TimeUnit.SECONDS).probability(Category.NONE) >= 0);
+            local.closeAsync().get(30, TimeUnit.SECONDS);
+            assertFailsWith(RejectedExecutionException.class, local.moderate("after close"));
         }
+    }
+
+    private static Throwable assertFailsWith(Class<? extends Throwable> type, CompletableFuture<?> future) {
+        ExecutionException failure = assertThrows(ExecutionException.class, () -> future.get(30, TimeUnit.SECONDS));
+        return assertInstanceOf(type, failure.getCause());
     }
 
     private static void assertModeration(Moderation expected, Moderation actual) {

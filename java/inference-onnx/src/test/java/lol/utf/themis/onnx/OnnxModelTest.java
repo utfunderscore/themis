@@ -81,11 +81,11 @@ class OnnxModelTest {
             expected.addAll(List.of(example.logits()));
         }
         float[][] want = expected.toArray(float[][]::new);
-        try (InferenceExecutor fifo = InferenceExecutor.fifo(model);
-             InferenceExecutor batched = InferenceExecutor.batched(model, 3)) {
+        try (InferenceExecutor<ModelInput> sequential = InferenceExecutor.create(model, 1);
+             InferenceExecutor<ModelInput> batched = InferenceExecutor.create(model, 3)) {
             List<CompletableFuture<float[]>> single = new ArrayList<>();
             for (ModelInput input : inputs) {
-                single.add(fifo.submit(input));
+                single.add(sequential.submit(input));
             }
             CompletableFuture<List<float[]>> grouped = batched.submitAll(inputs);
             assertLogits(want, single.stream().map(CompletableFuture::join).toArray(float[][]::new));

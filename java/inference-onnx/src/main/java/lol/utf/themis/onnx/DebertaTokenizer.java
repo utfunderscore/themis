@@ -56,7 +56,8 @@ final class DebertaTokenizer {
                 }
             }
             if (matchStart > position) {
-                for (int id : sentencePiece.encode(text.substring(position, matchStart))) {
+                int remaining = limit - (count - 1);
+                for (int id : sentencePiece.encode(text.substring(position, matchStart), remaining)) {
                     if (count - 1 == limit) {
                         break;
                     }

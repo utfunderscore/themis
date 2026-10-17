@@ -1,9 +1,12 @@
 package lol.utf.themis.onnx;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -21,6 +24,10 @@ class TokenizerTest {
     private static final SentencePiece MODEL = model(true);
 
     private static SentencePiece model(boolean addDummyPrefix) {
+        return model(addDummyPrefix, List.of());
+    }
+
+    private static SentencePiece model(boolean addDummyPrefix, List<String> extraPieces) {
         List<SentencePiece.Piece> pieces = new ArrayList<>();
         pieces.add(new SentencePiece.Piece("[PAD]", 0, SentencePiece.CONTROL));
         pieces.add(new SentencePiece.Piece("[CLS]", 0, SentencePiece.CONTROL));
@@ -31,6 +38,9 @@ class TokenizerTest {
         }
         for (int i = 0; i < NORMAL.size(); i++) {
             pieces.add(new SentencePiece.Piece(NORMAL.get(i), SCORES[i], SentencePiece.NORMAL));
+        }
+        for (String extra : extraPieces) {
+            pieces.add(new SentencePiece.Piece(extra, -10, SentencePiece.NORMAL));
         }
         return new SentencePiece(pieces, new SentencePieceNormalizer(new byte[0], addDummyPrefix, true, true));
     }
@@ -67,6 +77,27 @@ class TokenizerTest {
     @Test
     void omitsDummyPrefixWhenDisabled() {
         assertArrayEquals(new int[] {piece("h"), piece("e"), piece("llo")}, model(false).encode("hello"));
+    }
+
+    @Test
+    void earlyStopReturnsPrefixOfFullEncoding() {
+        String text = "hello hell  world hellø 👋 hello world";
+        int[] full = MODEL.encode(text);
+        for (int minTokens = 0; minTokens <= full.length + 1; minTokens++) {
+            int[] prefix = MODEL.encode(text, minTokens);
+            assertTrue(prefix.length >= Math.min(minTokens, full.length), "minTokens " + minTokens);
+            assertArrayEquals(Arrays.copyOf(full, prefix.length), prefix, "minTokens " + minTokens);
+        }
+        assertArrayEquals(new int[] {piece("▁hello")}, MODEL.encode(text, 1));
+        // Byte fallback counts every byte: "hellø" is 5 ids, so 6 ids stops before "▁👋".
+        assertEquals(1 + 3 + 1 + 5, MODEL.encode(text, 6).length);
+    }
+
+    @Test
+    void encodesFullTextWhenAPieceSpansASpace() {
+        SentencePiece spanning = model(true, List.of("o▁w"));
+        String text = "hello world hello world";
+        assertArrayEquals(spanning.encode(text), spanning.encode(text, 1));
     }
 
     @Test
