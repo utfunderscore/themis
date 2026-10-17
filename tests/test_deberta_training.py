@@ -119,6 +119,8 @@ class DebertaTrainingTests(unittest.TestCase):
             self.assertIn("validation_category_teacher_kl", metrics["validation"])
             self.assertIn("validation_action_teacher_kl", metrics["validation"])
             self.assertTrue(Path(metrics["best_checkpoint"]).is_dir())
+            tokenizer_config = json.loads((result["model_directory"] / "tokenizer_config.json").read_text())
+            self.assertEqual(tokenizer_config["model_max_length"], 16)
             saved = DebertaV2ForSequenceClassification.from_pretrained(result["model_directory"])
             best = DebertaV2ForSequenceClassification.from_pretrained(metrics["best_checkpoint"])
             self.assertEqual(tuple(saved.config.id2label.values()), LABELS + ACTION_LABELS)

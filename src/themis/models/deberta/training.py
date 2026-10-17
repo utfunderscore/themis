@@ -193,6 +193,8 @@ def train(
     tokenizer = AutoTokenizer.from_pretrained(
         config.model_name, revision=config.revision, use_fast=False,
     )
+    # The base tokenizer has no limit; save the trained one with ours.
+    tokenizer.model_max_length = config.max_length
     datasets = {split: SoftTargetDataset(source / f"{split}.parquet", tokenizer, config.max_length)
                 for split in ("train", "validation", "test")}
     model = AutoModelForSequenceClassification.from_pretrained(

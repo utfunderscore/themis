@@ -208,7 +208,9 @@ for text, c, a in zip(texts, softmax(logits[:, :6]), softmax(logits[:, 6:])):
 
 `onnx/inference_config.json` records the logit groups, label order, token
 limit and tokenizer settings. Use it to port the model to other runtimes.
-The [Themis Java library](https://github.com/utfunderscore/themis/tree/main/java)
+`onnx/` also contains the tokenizer files, so the whole directory is a
+self-contained bundle. The
+[Themis Java library](https://github.com/utfunderscore/themis/tree/main/java)
 runs this bundle from Java 21 with ONNX Runtime.
 
 ## Limitations

@@ -60,3 +60,5 @@ class DebertaInferenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Supply max_length"):
                 Moderation(directory)
             self.assertEqual(Moderation(directory, device="cpu", max_length=12).predict([]), [])
+            inference.tokenizer.save_pretrained(directory)
+            self.assertEqual(Moderation(directory, device="cpu").max_length, 12)
