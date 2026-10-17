@@ -1,97 +1,93 @@
 # Java inference
 
-Java 21 Gradle project for implementing inference with the exported
-DeBERTa ONNX model.
+This Java 21 project lets you use the Themis text moderation model from a Java
+application. It contains a library (`inference-onnx`) and a small command-line
+tool (`inference-cli`). Both use an exported model bundle produced by the
+Python project; the bundle is a directory on disk, not part of the Java JAR.
 
-## Module
+## Use the moderation API
 
-- `inference-onnx`: inference implementation using the CPU ONNX Runtime Java library.
-- `inference-cli`: simple command-line app that moderates text lines from stdin.
-
-Source packages use `lol.utf.themis`. `inference-onnx` is a Gradle subproject,
-not a JPMS module.
-
-## Moderation API
-
-`Moderator` loads a bundle directory exported by the Python exporter and turns
-text into a `Moderation`, matching Python's `Moderation.predict`: the most
-probable `Category` (`NONE`, `PROFANITY`, `INSULT`, `SLUR`, `SEXUAL`, `THREAT`)
-and `Action` (`ALLOW`, `BLOCK_AND_REVIEW`), plus each group's independent
-probabilities. `BLOCK_AND_REVIEW` means send for human review, independently
-of the category.
+Load a model bundle once, use the `Moderator` to score text, then close it when
+you are done. The `try` block below closes the model automatically:
 
 ```java
-try (Moderator moderator = Moderator.load(bundle, Scheduling.batched(16))) {
+import java.nio.file.Path;
+import lol.utf.themis.onnx.Action;
+import lol.utf.themis.onnx.Category;
+import lol.utf.themis.onnx.Moderation;
+import lol.utf.themis.onnx.Moderator;
+
+Path bundle = Path.of("/path/to/exported/model-bundle");
+
+try (Moderator moderator = Moderator.load(bundle)) {
     Moderation result = moderator.moderate("hello world");
-    double insult = result.probability(Category.INSULT);
-    if (result.action() == Action.BLOCK_AND_REVIEW) { ... }
+
+    System.out.println("Category: " + result.category());
+    System.out.println("Action: " + result.action());
+    System.out.println("Insult probability: " + result.probability(Category.INSULT));
+
+    if (result.action() == Action.BLOCK_AND_REVIEW) {
+        System.out.println("Send this text for review.");
+    }
 }
 ```
 
-- `moderate(text)` / `moderateAll(texts)` block; `submit(text)` /
-  `submitAll(texts)` return `CompletableFuture`s. All are thread safe.
-- Requests from all threads share one FIFO queue served by a single inference
-  thread, so the model never runs concurrently. The thread starts on a request
-  as soon as it is free; it never waits for a batch to fill.
-- `Scheduling.fifo()` (the default) runs one text per model call.
-  `Scheduling.batched(maxBatchSize)` lets texts that queued while a call was
-  running share the next call. `withQueueCapacity` bounds the queue; a full
-  queue throws `RejectedExecutionException`.
-- Futures complete on the inference thread, so use `*Async` stages for slow
-  follow-up work. Blocking calls made from that thread throw
-  `IllegalStateException` instead of deadlocking.
-- `close()` finishes queued requests, then releases the model.
+`category()` and `action()` return the most likely labels. `probability(...)`
+returns the probability for a particular label. Categories are `NONE`,
+`PROFANITY`, `INSULT`, `SLUR`, `SEXUAL`, and `THREAT`; actions are `ALLOW` and
+`BLOCK_AND_REVIEW`. The action and category are scored separately.
 
-ONNX Runtime still parallelizes each model call across CPU cores. To keep
-inference on one core, pass session options with `setIntraOpNumThreads(1)` to
-`Moderator.load(bundle, scheduling, sessionOptions)`.
+For several texts, use `moderateAll(List<String>)`; results come back in the
+same order as the input. If your application uses asynchronous code, `submit`
+and `submitAll` return `CompletableFuture` results instead of waiting for
+inference to finish.
 
-Tokenization is a pure-Java port of the slow `DebertaV2Tokenizer` (SentencePiece
-unigram with `nmt_nfkc` normalization and byte fallback). Texts are truncated to
-the bundle's `max_length`. Loading validates `inference_config.json` against the
-labels, tokenizer settings and postprocessing implemented here.
+## Run the CLI
 
-## CLI
-
-`inference-cli` reads one text per line from stdin and moderates each in FIFO
-order (`Scheduling.fifo()`, one text per model call), printing
-`action<TAB>category<TAB>category-probability<TAB>text`. Blank lines are skipped;
-a failing line is reported on stderr and makes the exit code 1.
+The CLI reads one text per line from standard input and prints the action,
+category, category probability, and original text for each line. Provide the
+path to an exported model bundle as its argument:
 
 ```sh
-./gradlew :inference-cli:run --args=/path/to/bundle   # type texts, Ctrl-D to finish
-./gradlew :inference-cli:installDist                  # then: inference-cli/build/install/inference-cli/bin/inference-cli /path/to/bundle
+./gradlew :inference-cli:run --args="/path/to/exported/model-bundle"
 ```
 
-## Build
+Type or paste text, one line at a time. Press Ctrl-D on macOS/Linux or Ctrl-Z
+then Enter on Windows when you are finished. You can also pipe in a file:
 
-Install a JDK 21 and set `JAVA_HOME` to its installation directory. From this
-directory, run:
+```sh
+./gradlew :inference-cli:run --args="/path/to/exported/model-bundle" < input.txt
+```
+
+To create a standalone CLI distribution, run `./gradlew
+:inference-cli:installDist`. Then run the generated `inference-cli` script in
+`inference-cli/build/install/inference-cli/bin/`, passing the bundle path in
+the same way.
+
+## Build the project
+
+Install a JDK 21 and set `JAVA_HOME` to its installation directory. In a
+terminal, go to this `java` directory and run:
 
 ```sh
 ./gradlew build
 ```
 
-On Windows use `gradlew.bat build`. The wrapper downloads the pinned Gradle
-distribution on first use; dependencies are resolved from Maven Central.
-Compilation uses the Java 21 toolchain and release target.
+On Windows, run `gradlew.bat build`. The first build downloads Gradle and the
+project's dependencies. To build only the library, use
+`./gradlew :inference-onnx:build`; to build only the CLI, use
+`./gradlew :inference-cli:build`.
 
-Module JARs and source JARs are written to each module's `build/libs/` directory.
-These are library JARs; dependencies must also be on the consuming application's
-runtime classpath.
+The library is provided as a Gradle project dependency. In a Gradle project
+that includes this source tree, add:
 
-Dependency versions are maintained in `gradle/libs.versions.toml`.
-Tests use JUnit and run with `./gradlew build`. `ModeratorTest` and `OnnxModelTest`
-compare tokenization, logits and probabilities with Python outputs and are skipped
-unless an exported bundle is given:
-
-```sh
-./gradlew test -Pthemis.onnx.bundle=/path/to/bundle
+```kotlin
+dependencies {
+    implementation(project(":inference-onnx"))
+}
 ```
 
-## Model integration
-
-The Python exporter is `src/themis/models/deberta/onnx_export.py` relative
-to the repository root. If tokenizer behavior or label order changes in Python,
-update the Java tokenizer and `Category`/`Action` enums to match. Model bundles
-should stay external to the library JARs.
+If you are using the library from a separate project, its JAR is created in
+`inference-onnx/build/libs/`. The ONNX Runtime, Gson, and Protobuf Java dependencies are also
+needed at runtime, so make sure your application resolves the library's
+dependencies as well.
