@@ -13,6 +13,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +23,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -149,6 +153,50 @@ class ModeratorTest {
         Moderator closed = Moderator.load(bundle);
         closed.close();
         assertThrows(RejectedExecutionException.class, () -> closed.moderate("hello"));
+    }
+
+    @Test
+    void closingFromInferenceThreadLeavesQueuedRequestsAndModeratorUsable() throws Exception {
+        try (Moderator local = Moderator.load(bundle)) {
+            Field executorField = Moderator.class.getDeclaredField("executor");
+            executorField.setAccessible(true);
+            InferenceExecutor executor = (InferenceExecutor) executorField.get(local);
+            Field lockField = InferenceExecutor.class.getDeclaredField("lock");
+            lockField.setAccessible(true);
+            ReentrantLock queueLock = (ReentrantLock) lockField.get(executor);
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            CompletableFuture<Void> callback;
+            // Keep the worker from completing the request before the callback is attached.
+            queueLock.lock();
+            try {
+                callback = local.submit("hello").thenAccept(ignored -> {
+                    assertTrue(executor.isWorkerThread());
+                    entered.countDown();
+                    try {
+                        assertTrue(release.await(30, TimeUnit.SECONDS), "callback was not released");
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new AssertionError(e);
+                    }
+                    assertThrows(IllegalStateException.class, local::close);
+                });
+            } finally {
+                queueLock.unlock();
+            }
+            CompletableFuture<Moderation> queued;
+            try {
+                assertTrue(entered.await(30, TimeUnit.SECONDS), "callback did not start");
+                queued = local.submit("second message");
+            } finally {
+                release.countDown();
+            }
+            callback.get(30, TimeUnit.SECONDS);
+            Moderation result = queued.get(30, TimeUnit.SECONDS);
+            assertModeration(result, local.submit("second message").get(30, TimeUnit.SECONDS));
+            local.close();
+            assertThrows(RejectedExecutionException.class, () -> local.submit("after close"));
+        }
     }
 
     private static void assertModeration(Moderation expected, Moderation actual) {

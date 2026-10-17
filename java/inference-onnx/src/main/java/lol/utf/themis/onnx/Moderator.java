@@ -124,9 +124,15 @@ public final class Moderator implements AutoCloseable {
         return executor.submitAll(inputs).thenApply(rows -> rows.stream().map(this::decode).toList());
     }
 
-    /** Finishes queued requests, then releases the model. */
+    /**
+     * Finishes queued requests, then releases the model.
+     *
+     * @throws IllegalStateException if called from the inference thread; use an
+     *     {@code *Async} stage to close from a future callback
+     */
     @Override
     public void close() {
+        requireNotWorker();
         try {
             executor.close();
         } finally {
@@ -163,7 +169,7 @@ public final class Moderator implements AutoCloseable {
     private void requireNotWorker() {
         if (executor.isWorkerThread()) {
             throw new IllegalStateException(
-                    "Blocking moderation from the inference thread would deadlock; use submit and *Async stages");
+                    "Blocking operations from the inference thread would deadlock; use submit and *Async stages");
         }
     }
 
