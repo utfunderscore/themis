@@ -5,6 +5,39 @@ application. It contains a library (`inference-onnx`) and a small command-line
 tool (`inference-cli`). Both use an exported model bundle produced by the
 Python project; the bundle is a directory on disk, not part of the Java JAR.
 
+## Download a model automatically
+
+`ModelDownloader` fetches the official model from Hugging Face
+([`utfunderscore/themis-moderation`](https://huggingface.co/utfunderscore/themis-moderation)):
+
+```java
+import lol.utf.themis.onnx.ModelDownloader;
+import lol.utf.themis.onnx.Moderator;
+
+try (Moderator moderator = ModelDownloader.download()
+        .thenCompose(Moderator::load).join()) {
+    System.out.println(moderator.moderate("hello world").join().action());
+}
+```
+
+The first call downloads `model.onnx`, `spm.model`, `tokenizer_config.json`, and
+`inference_config.json` from the repository's `onnx/` folder into a `themis`
+folder in the working directory (where the `java` command was started). Later
+calls reuse the cached bundle without network access.
+To choose a cache location, use `ModelDownloader.download(Path.of("/your/cache"))`.
+
+Each library version is pinned to one model commit
+(`ModelDownloader.DEFAULT_REVISION`), so upgrading the library is how you get a
+newer model. To use a different repository or revision, call
+`ModelDownloader.download("OWNER/MODEL", "COMMIT")` with a public repository
+published by `themis.models.deberta.hub.upload_model`. Use a commit ID: branch
+and tag names work, but cached downloads are not checked for updates.
+
+Downloads stream to disk and are published to the cache only after every file
+succeeds. Failures complete the future exceptionally; calling again retries a
+failed download. Private and gated repositories are not supported. Model loading
+performs compatibility validation after downloading.
+
 ## Use the moderation API
 
 Load a model bundle once, use the `Moderator` to score text, then close it when
@@ -19,8 +52,8 @@ import lol.utf.themis.onnx.Moderator;
 
 Path bundle = Path.of("/path/to/exported/model-bundle");
 
-try (Moderator moderator = Moderator.load(bundle)) {
-    Moderation result = moderator.moderate("hello world");
+try (Moderator moderator = Moderator.load(bundle).join()) {
+    Moderation result = moderator.moderate("hello world").join();
 
     System.out.println("Category: " + result.category());
     System.out.println("Action: " + result.action());
@@ -38,9 +71,8 @@ returns the probability for a particular label. Categories are `NONE`,
 `BLOCK_AND_REVIEW`. The action and category are scored separately.
 
 For several texts, use `moderateAll(List<String>)`; results come back in the
-same order as the input. If your application uses asynchronous code, `submit`
-and `submitAll` return `CompletableFuture` results instead of waiting for
-inference to finish.
+same order as the input. Loading and moderation return `CompletableFuture`
+results; use `.join()` to wait or compose asynchronous callbacks.
 
 ## Run the CLI
 
