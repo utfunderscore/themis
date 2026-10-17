@@ -45,7 +45,7 @@ public final class Moderator implements AutoCloseable {
 
     private final DebertaTokenizer tokenizer;
     private final OnnxModel model;
-    private final InferenceExecutor<ModelInput> executor;
+    private final InferenceExecutor executor;
     private final int categoryStart;
     private final int actionStart;
 

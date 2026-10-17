@@ -8,15 +8,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
 
 /**
  * Thread-safe asynchronous front end for an {@link InferenceModel}, served by a
  * single worker thread so the model is never called concurrently.
- *
- * <p>Requests are queued as {@code T} and converted to {@link ModelInput} by the
- * encoder on the worker thread, just before their batch runs, so submitting does
- * no work beyond queueing. An encoder failure fails only that request.
  *
  * <p>Requests from any number of threads enter one unbounded FIFO queue. Whenever
  * the worker is free it immediately takes what is queued, up to
@@ -37,7 +32,7 @@ import java.util.function.Function;
  * futures are cancelled before they are taken are skipped. The executor does not
  * close the model.
  */
-final class InferenceExecutor<T> implements AutoCloseable {
+final class InferenceExecutor implements AutoCloseable {
 
     static final String QUEUE_WARNING_THRESHOLD_ENV = "THEMIS_QUEUE_WARNING_THRESHOLD";
     static final int DEFAULT_QUEUE_WARNING_THRESHOLD = 1024;
@@ -47,57 +42,41 @@ final class InferenceExecutor<T> implements AutoCloseable {
             parseQueueWarningThreshold(System.getenv(QUEUE_WARNING_THRESHOLD_ENV));
 
     private final InferenceModel model;
-    private final Function<? super T, ModelInput> encoder;
     private final int maxBatchSize;
     private final int queueWarningThreshold;
-    private final ArrayDeque<Request<T>> queue = new ArrayDeque<>();
+    private final ArrayDeque<Request> queue = new ArrayDeque<>();
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition available = lock.newCondition();
     private final Thread worker;
     private boolean closed;
     private boolean backlogWarned;
 
-    private InferenceExecutor(InferenceModel model, Function<? super T, ModelInput> encoder,
-                              int maxBatchSize, int queueWarningThreshold) {
+    private InferenceExecutor(InferenceModel model, int maxBatchSize, int queueWarningThreshold) {
         this.model = model;
-        this.encoder = encoder;
         this.maxBatchSize = maxBatchSize;
         this.queueWarningThreshold = queueWarningThreshold;
         this.worker = Thread.ofPlatform().name("themis-onnx-inference").daemon(true).unstarted(this::work);
     }
 
     /**
-     * Starts an executor for already-encoded inputs that runs up to
-     * {@code maxBatchSize} queued requests per model call.
+     * Starts an executor that runs up to {@code maxBatchSize} queued requests per
+     * model call.
      *
      * @throws IllegalArgumentException if {@code maxBatchSize} is not positive
      */
-    public static InferenceExecutor<ModelInput> create(InferenceModel model, int maxBatchSize) {
-        return create(model, Function.identity(), maxBatchSize);
+    public static InferenceExecutor create(InferenceModel model, int maxBatchSize) {
+        return create(model, maxBatchSize, QUEUE_WARNING_THRESHOLD);
     }
 
-    /**
-     * Starts an executor that encodes each request with {@code encoder} on the
-     * worker thread and runs up to {@code maxBatchSize} queued requests per model call.
-     *
-     * @throws IllegalArgumentException if {@code maxBatchSize} is not positive
-     */
-    public static <T> InferenceExecutor<T> create(InferenceModel model, Function<? super T, ModelInput> encoder,
-                                                  int maxBatchSize) {
-        return create(model, encoder, maxBatchSize, QUEUE_WARNING_THRESHOLD);
-    }
-
-    static <T> InferenceExecutor<T> create(InferenceModel model, Function<? super T, ModelInput> encoder,
-                                           int maxBatchSize, int queueWarningThreshold) {
+    static InferenceExecutor create(InferenceModel model, int maxBatchSize, int queueWarningThreshold) {
         Objects.requireNonNull(model, "model");
-        Objects.requireNonNull(encoder, "encoder");
         if (maxBatchSize < 1) {
             throw new IllegalArgumentException("maxBatchSize must be positive");
         }
         if (queueWarningThreshold < 1) {
             throw new IllegalArgumentException("queueWarningThreshold must be positive");
         }
-        InferenceExecutor<T> executor = new InferenceExecutor<>(model, encoder, maxBatchSize, queueWarningThreshold);
+        InferenceExecutor executor = new InferenceExecutor(model, maxBatchSize, queueWarningThreshold);
         executor.worker.start();
         return executor;
     }
@@ -131,7 +110,7 @@ final class InferenceExecutor<T> implements AutoCloseable {
      * future fails with {@link RejectedExecutionException} if the executor is
      * closed, or {@link NullPointerException} if the request is null.
      */
-    public CompletableFuture<float[]> submit(T request) {
+    public CompletableFuture<float[]> submit(ModelInput request) {
         try {
             return enqueue(List.of(request)).getFirst();
         } catch (RuntimeException e) {
@@ -144,7 +123,7 @@ final class InferenceExecutor<T> implements AutoCloseable {
      * logits in request order. Either every request is queued or none is. Never
      * throws: failures are reported as for {@link #submit}.
      */
-    public CompletableFuture<List<float[]>> submitAll(List<? extends T> requests) {
+    public CompletableFuture<List<float[]>> submitAll(List<ModelInput> requests) {
         try {
             List<CompletableFuture<float[]>> futures = enqueue(List.copyOf(requests));
             return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
@@ -184,7 +163,7 @@ final class InferenceExecutor<T> implements AutoCloseable {
         }
     }
 
-    private List<CompletableFuture<float[]>> enqueue(List<? extends T> requests) {
+    private List<CompletableFuture<float[]>> enqueue(List<ModelInput> requests) {
         List<CompletableFuture<float[]>> futures = new ArrayList<>(requests.size());
         if (requests.isEmpty()) {
             return futures;
@@ -194,9 +173,9 @@ final class InferenceExecutor<T> implements AutoCloseable {
             if (closed) {
                 throw new RejectedExecutionException("Executor is closed");
             }
-            for (T request : requests) {
+            for (ModelInput request : requests) {
                 CompletableFuture<float[]> future = new CompletableFuture<>();
-                queue.addLast(new Request<>(request, future));
+                queue.addLast(new Request(request, future));
                 futures.add(future);
             }
             if (!backlogWarned && queue.size() > queueWarningThreshold) {
@@ -213,7 +192,7 @@ final class InferenceExecutor<T> implements AutoCloseable {
     }
 
     private void work() {
-        List<Request<T>> batch;
+        List<Request> batch;
         while ((batch = nextBatch()) != null) {
             if (!batch.isEmpty()) {
                 execute(batch);
@@ -222,7 +201,7 @@ final class InferenceExecutor<T> implements AutoCloseable {
     }
 
     /** Returns the next batch, possibly empty if all were cancelled, or null on shutdown. */
-    private List<Request<T>> nextBatch() {
+    private List<Request> nextBatch() {
         lock.lock();
         try {
             while (queue.isEmpty()) {
@@ -232,9 +211,9 @@ final class InferenceExecutor<T> implements AutoCloseable {
                 available.awaitUninterruptibly();
             }
             int size = Math.min(maxBatchSize, queue.size());
-            List<Request<T>> batch = new ArrayList<>(size);
+            List<Request> batch = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                Request<T> request = queue.pollFirst();
+                Request request = queue.pollFirst();
                 if (!request.future().isDone()) {
                     batch.add(request);
                 }
@@ -248,20 +227,8 @@ final class InferenceExecutor<T> implements AutoCloseable {
         }
     }
 
-    private void execute(List<Request<T>> requests) {
-        List<Request<T>> batch = new ArrayList<>(requests.size());
-        List<ModelInput> inputs = new ArrayList<>(requests.size());
-        for (Request<T> request : requests) {
-            try {
-                inputs.add(Objects.requireNonNull(encoder.apply(request.value()), "encoder returned null"));
-                batch.add(request);
-            } catch (Throwable failure) {
-                request.future().completeExceptionally(failure);
-            }
-        }
-        if (batch.isEmpty()) {
-            return;
-        }
+    private void execute(List<Request> batch) {
+        List<ModelInput> inputs = batch.stream().map(Request::input).toList();
         float[][] logits;
         try {
             logits = model.run(inputs);
@@ -270,7 +237,7 @@ final class InferenceExecutor<T> implements AutoCloseable {
                         "Model returned " + logits.length + " rows for batch of " + batch.size());
             }
         } catch (Throwable failure) {
-            for (Request<T> request : batch) {
+            for (Request request : batch) {
                 request.future().completeExceptionally(failure);
             }
             return;
@@ -280,6 +247,6 @@ final class InferenceExecutor<T> implements AutoCloseable {
         }
     }
 
-    private record Request<T>(T value, CompletableFuture<float[]> future) {
+    private record Request(ModelInput input, CompletableFuture<float[]> future) {
     }
 }

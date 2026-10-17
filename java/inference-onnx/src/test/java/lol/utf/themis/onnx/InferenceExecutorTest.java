@@ -22,7 +22,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -102,7 +101,7 @@ class InferenceExecutorTest {
     void batchSizeOneRunsEachRequestAloneInSubmissionOrder() throws Exception {
         FakeModel model = new FakeModel(false);
         List<CompletableFuture<float[]>> futures = new ArrayList<>();
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 1)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 1)) {
             for (ModelInput input : inputs(0, 50)) {
                 futures.add(executor.submit(input));
             }
@@ -117,7 +116,7 @@ class InferenceExecutorTest {
     @Test
     void groupsQueuedRequestsInOrderUpToMaxBatchSize() throws Exception {
         FakeModel model = new FakeModel(true);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 4)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 4)) {
             CompletableFuture<float[]> first = executor.submit(input(0));
             model.entered.await();
             List<CompletableFuture<float[]>> rest = new ArrayList<>();
@@ -137,7 +136,7 @@ class InferenceExecutorTest {
     @Test
     void runsQueuedRequestsImmediatelyWithoutWaitingForBatch() throws Exception {
         FakeModel model = new FakeModel(false);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 64)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 64)) {
             assertArrayEquals(new float[] {0, 3, 1}, executor.submit(input(0)).get(5, TimeUnit.SECONDS));
             List<float[]> logits = executor.submitAll(inputs(1, 4)).get(5, TimeUnit.SECONDS);
             for (int i = 0; i < 3; i++) {
@@ -151,7 +150,7 @@ class InferenceExecutorTest {
     void concurrentSubmittersReceiveTheirOwnResults() throws Exception {
         FakeModel model = new FakeModel(false);
         ExecutorService clients = Executors.newFixedThreadPool(8);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 16)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 16)) {
             List<Future<?>> tasks = new ArrayList<>();
             for (int client = 0; client < 8; client++) {
                 long base = client * 1000L;
@@ -179,34 +178,9 @@ class InferenceExecutorTest {
     }
 
     @Test
-    void encodesOnWorkerAndEncoderFailureFailsOnlyThatRequest() throws Exception {
-        FakeModel model = new FakeModel(false);
-        Set<Thread> encoderThreads = ConcurrentHashMap.newKeySet();
-        Function<Long, ModelInput> encoder = id -> {
-            encoderThreads.add(Thread.currentThread());
-            if (id == 2) {
-                throw new IllegalArgumentException("bad input");
-            }
-            return input(id);
-        };
-        try (InferenceExecutor<Long> executor = InferenceExecutor.create(model, encoder, 8)) {
-            CompletableFuture<float[]> first = executor.submit(1L);
-            CompletableFuture<float[]> bad = executor.submit(2L);
-            CompletableFuture<float[]> third = executor.submit(3L);
-            assertEquals(1, first.get()[0]);
-            ExecutionException failure = assertThrows(ExecutionException.class, bad::get);
-            assertInstanceOf(IllegalArgumentException.class, failure.getCause());
-            assertEquals(3, third.get()[0]);
-            assertFalse(encoderThreads.contains(Thread.currentThread()));
-        }
-        assertEquals(model.threads, encoderThreads);
-        assertEquals(List.of(1L, 3L), model.order());
-    }
-
-    @Test
     void completesFuturesOnTheWorkerThread() throws Exception {
         FakeModel model = new FakeModel(true);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 1)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 1)) {
             assertFalse(executor.isWorkerThread());
             CompletableFuture<Boolean> onWorker =
                     executor.submit(input(0)).thenApply(ignored -> executor.isWorkerThread());
@@ -218,7 +192,7 @@ class InferenceExecutorTest {
     @Test
     void modelFailureFailsBatchAndExecutorRecovers() throws Exception {
         FakeModel model = new FakeModel(false);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 1)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 1)) {
             model.fail.set(true);
             ExecutionException failure = assertThrows(ExecutionException.class,
                     () -> executor.submit(input(1)).get());
@@ -250,7 +224,7 @@ class InferenceExecutorTest {
         Logger logger = Logger.getLogger(InferenceExecutor.class.getName());
         logger.addHandler(handler);
         FakeModel model = new FakeModel(true);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, Function.<ModelInput>identity(), 1, 2)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 1, 2)) {
             CompletableFuture<float[]> running = executor.submit(input(0));
             model.entered.await();
             CompletableFuture<List<float[]>> queued = executor.submitAll(inputs(1, 4));
@@ -272,7 +246,7 @@ class InferenceExecutorTest {
     void validatesBatchSizeAndWarningThreshold() {
         FakeModel model = new FakeModel(false);
         assertThrows(IllegalArgumentException.class, () -> InferenceExecutor.create(model, 0));
-        assertThrows(IllegalArgumentException.class, () -> InferenceExecutor.create(model, Function.<ModelInput>identity(), 1, 0));
+        assertThrows(IllegalArgumentException.class, () -> InferenceExecutor.create(model, 1, 0));
         int fallback = InferenceExecutor.DEFAULT_QUEUE_WARNING_THRESHOLD;
         assertEquals(fallback, InferenceExecutor.parseQueueWarningThreshold(null));
         assertEquals(fallback, InferenceExecutor.parseQueueWarningThreshold(" "));
@@ -284,7 +258,7 @@ class InferenceExecutorTest {
     @Test
     void closeDrainsQueueAndRejectsNewWork() throws Exception {
         FakeModel model = new FakeModel(true);
-        InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 8);
+        InferenceExecutor executor = InferenceExecutor.create(model, 8);
         CompletableFuture<List<float[]>> pending = executor.submitAll(inputs(0, 3));
         Thread closer = Thread.ofPlatform().start(executor::close);
         model.release.countDown();
@@ -300,7 +274,7 @@ class InferenceExecutorTest {
     @Test
     void cancelledRequestsAreSkipped() throws Exception {
         FakeModel model = new FakeModel(true);
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(model, 1)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(model, 1)) {
             CompletableFuture<float[]> running = executor.submit(input(0));
             model.entered.await();
             CompletableFuture<float[]> cancelled = executor.submit(input(1));
@@ -315,7 +289,7 @@ class InferenceExecutorTest {
 
     @Test
     void emptySubmitAllCompletesImmediately() throws Exception {
-        try (InferenceExecutor<ModelInput> executor = InferenceExecutor.create(new FakeModel(false), 1)) {
+        try (InferenceExecutor executor = InferenceExecutor.create(new FakeModel(false), 1)) {
             assertEquals(List.of(), executor.submitAll(List.of()).get());
         }
     }
