@@ -4,10 +4,43 @@ This library checks a piece of text and tells you whether it contains something
 like profanity, insults or threats, and whether it should be held for a human
 to review.
 
+## Download a model automatically
+
+`ModelDownloader` fetches the official model from Hugging Face
+([`utfunderscore/themis-moderation`](https://huggingface.co/utfunderscore/themis-moderation)):
+
+```java
+import lol.utf.themis.onnx.ModelDownloader;
+import lol.utf.themis.onnx.Moderator;
+
+try (Moderator moderator = ModelDownloader.download()
+        .thenCompose(Moderator::load).join()) {
+    System.out.println(moderator.moderate("hello world").join().action());
+}
+```
+
+The first call downloads `model.onnx`, `spm.model`, `tokenizer_config.json`, and
+`inference_config.json` from the repository's `onnx/` folder into a `themis`
+folder in the working directory (where the `java` command was started). Later
+calls reuse the cached bundle without network access.
+To choose a cache location, use `ModelDownloader.download(Path.of("/your/cache"))`.
+
+Each library version is pinned to one model commit
+(`ModelDownloader.DEFAULT_REVISION`), so upgrading the library is how you get a
+newer model. To use a different repository or revision, call
+`ModelDownloader.download("OWNER/MODEL", "COMMIT")` with a public repository
+published by `themis.models.deberta.hub.upload_model`. Use a commit ID: branch
+and tag names work, but cached downloads are not checked for updates.
+
+Downloads stream to disk and are published to the cache only after every file
+succeeds. Failures complete the future exceptionally; calling again retries a
+failed download. Private and gated repositories are not supported. Model loading
+performs compatibility validation after downloading.
+
 ## Using it
 
-You need a **model folder** (made by the Python exporter in this repo). Point
-the library at it, then give it text:
+If you already have a **model folder** (made by the Python exporter in this
+repo), load it directly, then give it text:
 
 ```java
 import java.nio.file.Path;
@@ -22,7 +55,7 @@ try (Moderator moderator = Moderator.load(Path.of("/path/to/model-folder")).join
 }
 ```
 
-Nothing in the library throws. Loading and moderating both return a
+Downloading, loading and moderating return a
 `CompletableFuture`, which is Java's way of saying "the answer will arrive
 later". Any problem (a missing model folder, a closed moderator, a failing
 model) comes out through that future instead. The examples use `.join()` to wait
