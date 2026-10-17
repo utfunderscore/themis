@@ -39,7 +39,8 @@ class OnnxExportTests(unittest.TestCase):
             metadata = json.loads((destination / "inference_config.json").read_text())
             self.assertEqual(metadata["max_length"], 24)
             self.assertEqual(metadata["output_groups"]["action"]["start"], len(LABELS))
-            self.assertTrue((destination / "tokenizer_config.json").is_file())
+            tokenizer_config = json.loads((destination / "tokenizer_config.json").read_text())
+            self.assertEqual(tokenizer_config["model_max_length"], 24)
             fixtures = json.loads((destination / "validation_examples.json").read_text())
             self.assertEqual(len(fixtures[-1]["input_ids"][0]), 24)
             with self.assertRaises(FileExistsError):
