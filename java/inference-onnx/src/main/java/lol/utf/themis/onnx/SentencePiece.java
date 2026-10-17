@@ -10,6 +10,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import sentencepiece.SentencepieceModel.ModelProto;
+import sentencepiece.SentencepieceModel.NormalizerSpec;
+import sentencepiece.SentencepieceModel.TrainerSpec;
+
 /**
  * SentencePiece unigram encoder matching the reference implementation's
  * Viterbi segmentation and byte fallback. Immutable and thread safe.
@@ -23,7 +27,6 @@ final class SentencePiece {
     static final int UNUSED = 5;
     static final int BYTE = 6;
 
-    private static final int UNIGRAM = 1;
     private static final float UNKNOWN_PENALTY = 10.0f;
 
     record Piece(String piece, float score, int type) {
@@ -78,42 +81,28 @@ final class SentencePiece {
 
     /** Loads a unigram {@code .model} file trained with byte fallback. */
     static SentencePiece load(Path modelFile) throws IOException {
-        ProtobufReader model = new ProtobufReader(Files.readAllBytes(modelFile));
-        List<Piece> pieces = new ArrayList<>();
-        SentencePieceNormalizer normalizer = null;
-        int modelType = UNIGRAM;
-        boolean byteFallback = false;
-        boolean whitespaceSuffix = false;
-        while (model.next()) {
-            switch (model.field()) {
-                case 1 -> pieces.add(readPiece(model.readMessage()));
-                case 2 -> {
-                    ProtobufReader trainer = model.readMessage();
-                    while (trainer.next()) {
-                        switch (trainer.field()) {
-                            case 3 -> modelType = (int) trainer.readVarint();
-                            case 24 -> whitespaceSuffix = trainer.readBool();
-                            case 35 -> byteFallback = trainer.readBool();
-                            default -> trainer.skip();
-                        }
-                    }
-                }
-                case 3 -> normalizer = readNormalizer(model.readMessage());
-                default -> model.skip();
-            }
-        }
-        if (modelType != UNIGRAM) {
+        ModelProto model = ModelProto.parseFrom(Files.readAllBytes(modelFile));
+        TrainerSpec trainer = model.getTrainerSpec();
+        // Proto2 preserves unknown enum values as unknown fields, while getters
+        // return defaults. Reject them rather than accidentally accepting UNIGRAM.
+        if (trainer.getUnknownFields().hasField(TrainerSpec.MODEL_TYPE_FIELD_NUMBER)
+                || trainer.getModelType() != TrainerSpec.ModelType.UNIGRAM) {
             throw new IllegalArgumentException("Only unigram SentencePiece models are supported");
         }
-        if (!byteFallback) {
+        if (!trainer.getByteFallback()) {
             throw new IllegalArgumentException("Only SentencePiece models with byte fallback are supported");
         }
-        if (whitespaceSuffix) {
+        if (trainer.getTreatWhitespaceAsSuffix()) {
             throw new IllegalArgumentException("treat_whitespace_as_suffix is not supported");
         }
-        if (normalizer == null) {
-            normalizer = new SentencePieceNormalizer(new byte[0], true, true, true);
+        List<Piece> pieces = new ArrayList<>(model.getPiecesCount());
+        for (ModelProto.SentencePiece piece : model.getPiecesList()) {
+            if (piece.getUnknownFields().hasField(ModelProto.SentencePiece.TYPE_FIELD_NUMBER)) {
+                throw new IllegalArgumentException("Unknown piece type");
+            }
+            pieces.add(new Piece(piece.getPiece(), piece.getScore(), piece.getType().getNumber()));
         }
+        SentencePieceNormalizer normalizer = readNormalizer(model.getNormalizerSpec());
         return new SentencePiece(pieces, normalizer);
     }
 
@@ -181,41 +170,12 @@ final class SentencePiece {
         return Arrays.copyOf(ids, count);
     }
 
-    private static Piece readPiece(ProtobufReader message) {
-        String piece = "";
-        float score = 0;
-        int type = NORMAL;
-        while (message.next()) {
-            switch (message.field()) {
-                case 1 -> piece = message.readString();
-                case 2 -> score = message.readFloat();
-                case 3 -> type = (int) message.readVarint();
-                default -> message.skip();
-            }
+    private static SentencePieceNormalizer readNormalizer(NormalizerSpec spec) {
+        if (!spec.getNormalizationRuleTsv().isEmpty()) {
+            throw new IllegalArgumentException("normalization_rule_tsv is not supported");
         }
-        return new Piece(piece, score, type);
-    }
-
-    private static SentencePieceNormalizer readNormalizer(ProtobufReader message) {
-        byte[] charsmap = new byte[0];
-        boolean addDummyPrefix = true;
-        boolean removeExtraWhitespaces = true;
-        boolean escapeWhitespaces = true;
-        while (message.next()) {
-            switch (message.field()) {
-                case 2 -> charsmap = message.readBytes();
-                case 3 -> addDummyPrefix = message.readBool();
-                case 4 -> removeExtraWhitespaces = message.readBool();
-                case 5 -> escapeWhitespaces = message.readBool();
-                case 6 -> {
-                    if (!message.readString().isEmpty()) {
-                        throw new IllegalArgumentException("normalization_rule_tsv is not supported");
-                    }
-                }
-                default -> message.skip();
-            }
-        }
-        return new SentencePieceNormalizer(charsmap, addDummyPrefix, removeExtraWhitespaces, escapeWhitespaces);
+        return new SentencePieceNormalizer(spec.getPrecompiledCharsmap().toByteArray(),
+                spec.getAddDummyPrefix(), spec.getRemoveExtraWhitespaces(), spec.getEscapeWhitespaces());
     }
 
     private static int parseByte(String piece) {
