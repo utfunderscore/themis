@@ -34,3 +34,35 @@ class ModalTrainingTests(unittest.TestCase):
                 self.assertEqual(call.args, (
                     source / f"{split}.parquet", f"/runs/{run_id}/splits/{split}.parquet",
                 ))
+
+    def test_uploads_extra_splits_and_initial_model(self):
+        with TemporaryDirectory() as temp:
+            source = Path(temp) / "splits"
+            source.mkdir()
+            for split in ("train", "validation", "test", "teacher_test"):
+                (source / f"{split}.parquet").touch()
+            model = Path(temp) / "model"
+            model.mkdir()
+            (model / "config.json").touch()
+            with (
+                patch.object(modal_training.app, "run"),
+                patch.object(modal_training.modal, "enable_output"),
+                patch.object(modal_training.volume, "batch_upload") as upload,
+                patch.object(modal_training.train_remote, "remote", return_value={}) as remote,
+            ):
+                modal_training.train(source, config={"model_name": "ignored"}, init_model_directory=model)
+            run_id, config = remote.call_args.args
+            self.assertEqual(config, {"model_name": f"/training/runs/{run_id}/init_model"})
+            batch = upload.return_value.__enter__.return_value
+            self.assertEqual(batch.put_file.call_args_list[-1].args, (
+                source / "teacher_test.parquet", f"/runs/{run_id}/splits/teacher_test.parquet",
+            ))
+            batch.put_directory.assert_called_once_with(str(model), f"/runs/{run_id}/init_model")
+
+    def test_missing_initial_model_fails_before_starting_modal(self):
+        with TemporaryDirectory() as temp, patch.object(modal_training.app, "run") as run:
+            for split in ("train", "validation", "test"):
+                (Path(temp) / f"{split}.parquet").touch()
+            with self.assertRaises(FileNotFoundError):
+                modal_training.train(temp, init_model_directory=Path(temp) / "missing")
+            run.assert_not_called()

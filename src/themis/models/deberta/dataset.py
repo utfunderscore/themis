@@ -21,6 +21,27 @@ def _targets(record: dict, labels: tuple[str, ...]) -> list[float]:
     return [value / sum(values) for value in values]
 
 
+def assign_grouped_splits(frame: pl.DataFrame, *, group_column: str, class_column: str,
+                          seed: int = 42) -> pl.DataFrame:
+    """Add an approximately 80/10/10 ``split`` column, keeping each group together.
+
+    Groups are stratified by their modal class; cumulative row counts handle
+    groups of different sizes.
+    """
+    split_groups = frame.group_by(group_column).agg(
+        pl.col(class_column).mode().min().alias("group_class"), pl.len().alias("group_size"),
+    ).with_columns(pl.col(group_column).hash(seed=seed).alias("shuffle_key"))
+    split_groups = split_groups.sort("group_class", "shuffle_key", group_column).with_columns(
+        ((pl.col("group_size").cum_sum().over("group_class") - pl.col("group_size") / 2)
+         / pl.col("group_size").sum().over("group_class")).alias("split_position"),
+    ).with_columns(
+        pl.when(pl.col("split_position") < 0.8).then(pl.lit("train"))
+        .when(pl.col("split_position") < 0.9).then(pl.lit("validation"))
+        .otherwise(pl.lit("test")).alias("split"),
+    )
+    return frame.join(split_groups.select(group_column, "split"), on=group_column, maintain_order="left")
+
+
 def prepare_dataset(source_path: str | Path, output_directory: str | Path, *, seed: int = 42) -> dict[str, Path]:
     """Write approximately 80/10/10 splits, keeping normalized variants together.
 
@@ -56,20 +77,8 @@ def prepare_dataset(source_path: str | Path, output_directory: str | Path, *, se
         pl.col("action_targets").cast(pl.Array(pl.Float32, len(ACTION_LABELS))),
     )
 
-    # Stratify by each group's modal class; cumulative row counts handle variants.
-    split_groups = prepared_messages.group_by("normalized_content").agg(
-        pl.col("teacher_argmax").mode().min().alias("teacher_class"), pl.len().alias("group_size"),
-    ).with_columns(pl.col("normalized_content").hash(seed=seed).alias("shuffle_key"))
-    split_groups = split_groups.sort("teacher_class", "shuffle_key", "normalized_content").with_columns(
-        ((pl.col("group_size").cum_sum().over("teacher_class") - pl.col("group_size") / 2)
-         / pl.col("group_size").sum().over("teacher_class")).alias("split_position"),
-    ).with_columns(
-        pl.when(pl.col("split_position") < 0.8).then(pl.lit("train"))
-        .when(pl.col("split_position") < 0.9).then(pl.lit("validation"))
-        .otherwise(pl.lit("test")).alias("split"),
-    )
-    prepared_messages = prepared_messages.join(
-        split_groups.select("normalized_content", "split"), on="normalized_content", maintain_order="left",
+    prepared_messages = assign_grouped_splits(
+        prepared_messages, group_column="normalized_content", class_column="teacher_argmax", seed=seed,
     )
     output_directory = Path(output_directory)
     output_directory.mkdir(parents=True, exist_ok=False)
