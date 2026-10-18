@@ -149,6 +149,28 @@ class GuidedSamplingTests(unittest.TestCase):
                 guided_sample_dataset(source, output, {"absent": 1})
             self.assertFalse(output.exists())
 
+    def test_reuse_survives_moving_the_source(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "old" / "source.jsonl", root / "sample.jsonl"
+            source.parent.mkdir()
+            self.write_rows(source, self.make_rows())
+            guided_sample_dataset(source, output, {"A": 1}, seed=3)
+            manifest = output.with_name(output.name + ".manifest.json")
+            saved = json.loads(manifest.read_text())
+            self.assertEqual(saved["source_path"], str(source.resolve()))
+            # Manifests written before this change stored the path inside config.
+            saved["config"]["source_path"] = str(source.resolve())
+            manifest.write_text(json.dumps(saved))
+            moved = root / "new" / "source.jsonl"
+            moved.parent.mkdir()
+            source.rename(moved)
+            before = output.read_bytes()
+            self.assertEqual(guided_sample_dataset(moved, output, {"A": 1}, seed=3), output)
+            self.assertEqual(output.read_bytes(), before)
+            with self.assertRaises(FileExistsError):
+                guided_sample_dataset(moved, output, {"A": 1}, seed=4)
+
     def test_configuration_and_source_path_validation(self):
         with TemporaryDirectory() as directory:
             source, output = Path(directory) / "source.jsonl", Path(directory) / "sample.jsonl"
