@@ -40,6 +40,14 @@ class ApiTests(unittest.TestCase):
         schema = json.loads((Path(__file__).parents[1] / "openapi.json").read_text())
         self.assertEqual(create_app().openapi(), schema)
 
+    def test_tester_page_is_served_but_not_in_schema(self):
+        with TestClient(create_app(predictor=FakePredictor())) as client:
+            response = client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.headers["content-type"])
+        self.assertIn("/v1/inference", response.text)
+        self.assertNotIn("/", create_app().openapi()["paths"])
+
     def test_wrong_result_count_fails(self):
         class BrokenPredictor:
             def predict(self, texts, batch_size=32):

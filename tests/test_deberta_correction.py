@@ -83,8 +83,8 @@ class CorrectionDatasetTests(unittest.TestCase):
             root = Path(temp)
             teacher = root / "teacher"
             _write_teacher_splits(teacher, 10)
+            labeled = root / "labeled.jsonl"
             for rows, message in cases:
-                labeled = root / "labeled.jsonl"
                 labeled.write_text("".join(json.dumps(row) + "\n" for row in rows))
                 with self.assertRaisesRegex(ValueError, message):
                     prepare_correction_dataset(labeled, teacher, root / "out")

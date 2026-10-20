@@ -1,9 +1,11 @@
 """Distill category and moderation action. Requires the ``training`` extra."""
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -59,8 +61,13 @@ class TrainingConfig:
         if self.use_cpu and self.fp16:
             raise ValueError("fp16 requires a supported accelerator")
 
+    @classmethod
+    def from_mapping(cls, values: Mapping[str, object]) -> "TrainingConfig":
+        """Build from untyped settings such as JSON; __post_init__ validates them."""
+        return cls(**cast(Mapping[str, Any], values))
 
-class SoftTargetDataset(Dataset):
+
+class SoftTargetDataset(Dataset[dict[str, object]]):
     """Validate prepared Parquet and tokenize once, leaving padding to batches."""
 
     def __init__(self, path: str | Path, tokenizer, max_length: int) -> None:
@@ -102,7 +109,7 @@ class SoftTargetDataset(Dataset):
     def __len__(self) -> int:
         return len(self.targets)
 
-    def __getitem__(self, index: int) -> dict:
+    def __getitem__(self, index: int) -> dict[str, object]:
         return {**{key: values[index] for key, values in self.encodings.items()},
                 "labels": self.targets[index].tolist()}
 
@@ -139,12 +146,12 @@ def multitask_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
 
 def compute_metrics(prediction: EvalPrediction) -> dict[str, float]:
     metrics = {}
+    predictions, label_ids = np.asarray(prediction.predictions), np.asarray(prediction.label_ids)
     for name, start, stop, labels in (
         ("category", 0, len(LABELS), LABELS),
         ("action", len(LABELS), len(LABELS) + len(ACTION_LABELS), ACTION_LABELS),
     ):
-        task = EvalPrediction(predictions=prediction.predictions[:, start:stop],
-                              label_ids=prediction.label_ids[:, start:stop])
+        task = EvalPrediction(predictions=predictions[:, start:stop], label_ids=label_ids[:, start:stop])
         metrics.update({f"{name}_{key}": value for key, value in _task_metrics(task, labels).items()})
     return metrics
 

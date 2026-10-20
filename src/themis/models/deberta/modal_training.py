@@ -1,5 +1,6 @@
 """Run the shared DeBERTa trainer on Modal without local training dependencies."""
 
+from collections.abc import Mapping
 from pathlib import Path
 from uuid import uuid4
 
@@ -31,7 +32,7 @@ image = (
     volumes={str(ROOT): volume},
     max_containers=1,
 )
-def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
+def train_remote(run_id: str, config: Mapping[str, object]) -> dict[str, object]:
     """Train uploaded splits and commit artifacts before returning their locations."""
     import torch
 
@@ -39,7 +40,7 @@ def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
 
     if len(run_id) != 32 or any(char not in "0123456789abcdef" for char in run_id):
         raise ValueError("run_id must be a lowercase UUID hex string")
-    settings = TrainingConfig(**config)
+    settings = TrainingConfig.from_mapping(config)
     if settings.use_cpu:
         raise ValueError("Modal training requires use_cpu=False")
     if not torch.cuda.is_available():
@@ -64,7 +65,7 @@ def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
 def train(
     split_directory: str | Path,
     *,
-    config: dict[str, object] | None = None,
+    config: Mapping[str, object] | None = None,
     init_model_directory: str | Path | None = None,
 ) -> dict[str, object]:
     """Upload prepared splits and wait for GPU training; return Volume paths/metrics.

@@ -4,8 +4,10 @@ import json
 import platform
 from pathlib import Path
 from time import perf_counter
+from typing import cast
 
 import numpy as np
+import numpy.typing as npt
 import onnxruntime as ort
 import polars as pl
 import torch
@@ -23,7 +25,7 @@ def benchmark_onnx(
     batch_sizes: tuple[int, ...] = (1, 8, 32),
     threads: int = 6,
     repeats: int = 3,
-) -> dict:
+) -> dict[str, object]:
     """Time tokenization, forward pass and both softmaxes, excluding model load.
 
     Both backends use the original slow tokenizer, identical batches and CPU
@@ -58,7 +60,7 @@ def benchmark_onnx(
                 return_token_type_ids=False,
             )
             if backend == "onnx":
-                logits = session.run(["logits"], dict(inputs))[0]
+                logits = cast(npt.NDArray[np.float32], session.run(["logits"], dict(inputs))[0])
             else:
                 with torch.inference_mode():
                     logits = original.model(**inputs).logits.numpy()

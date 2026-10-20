@@ -34,7 +34,7 @@ class DebertaDatasetTests(unittest.TestCase):
             frames = [pl.read_parquet(path) for path in split_paths.values()]
             self.assertEqual(sum(frame.height for frame in frames), 120)
             combined = pl.concat(frames).sort("content")
-            self.assertEqual(combined["content"].to_list(), sorted(row["state"] for row in rows[:-1]))
+            self.assertEqual(combined["content"].to_list(), sorted(str(row["state"]) for row in rows[:-1]))
             groups = [{" ".join(text.casefold().split()) for text in frame["content"]} for frame in frames]
             for a, b in ((0, 1), (0, 2), (1, 2)):
                 self.assertFalse(groups[a] & groups[b])

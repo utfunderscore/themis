@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -98,12 +98,13 @@ class Moderation:
                 categories = logits[:, :len(LABELS)].softmax(dim=-1).cpu().tolist()
                 actions = logits[:, len(LABELS):].softmax(dim=-1).cpu().tolist()
                 for index, category, action in zip(indices, categories, actions, strict=True):
-                    category_scores = dict(zip(LABELS, category, strict=True))
-                    action_scores = dict(zip(ACTION_LABELS, action, strict=True))
+                    category_scores: dict[str, float] = dict(zip(LABELS, category, strict=True))
+                    action_scores: dict[str, float] = dict(zip(ACTION_LABELS, action, strict=True))
                     results[index] = Prediction(
                         category=max(category_scores, key=category_scores.__getitem__),
                         action=max(action_scores, key=action_scores.__getitem__),
                         category_probabilities=category_scores,
                         action_probabilities=action_scores,
                     )
-        return results
+        # Every index appears in exactly one batch above.
+        return cast(list[Prediction], results)

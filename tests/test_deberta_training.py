@@ -4,6 +4,7 @@ import unittest
 from contextlib import chdir
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 import polars as pl
@@ -11,7 +12,7 @@ import polars as pl
 HAS_TRAINING = all(importlib.util.find_spec(name) is not None
                    for name in ("torch", "transformers", "accelerate"))
 
-if HAS_TRAINING:
+if TYPE_CHECKING or HAS_TRAINING:
     import numpy as np
     import torch
     from transformers import BertTokenizerFast, DebertaV2Config, DebertaV2ForSequenceClassification
@@ -85,6 +86,7 @@ class DebertaTrainingTests(unittest.TestCase):
         loss = multitask_loss(logits, targets)
         self.assertAlmostEqual(loss.item(), np.log(6) + np.log(2), places=6)
         loss.backward()
+        assert logits.grad is not None
         torch.testing.assert_close(logits.grad[:, :6], torch.full((1, 6), 1 / 6) - targets[:, :6])
         torch.testing.assert_close(logits.grad[:, 6:], torch.tensor([[0.25, -0.25]]))
 
@@ -144,10 +146,12 @@ class DebertaTrainingTests(unittest.TestCase):
             self.assertIn("validation_action_teacher_kl", metrics["validation"])
             self.assertIn("teacher_test_category_teacher_agreement", metrics["teacher_test"])
             self.assertTrue(Path(metrics["best_checkpoint"]).is_dir())
-            tokenizer_config = json.loads((result["model_directory"] / "tokenizer_config.json").read_text())
+            model_directory = cast(Path, result["model_directory"])
+            tokenizer_config = json.loads((model_directory / "tokenizer_config.json").read_text())
             self.assertEqual(tokenizer_config["model_max_length"], 16)
-            saved = DebertaV2ForSequenceClassification.from_pretrained(result["model_directory"])
+            saved = DebertaV2ForSequenceClassification.from_pretrained(model_directory)
             best = DebertaV2ForSequenceClassification.from_pretrained(metrics["best_checkpoint"])
+            assert saved.config.id2label is not None
             self.assertEqual(tuple(saved.config.id2label.values()), LABELS + ACTION_LABELS)
             for key, value in saved.state_dict().items():
                 torch.testing.assert_close(value, best.state_dict()[key])

@@ -1,5 +1,8 @@
 """Sharded inference with Volume results and per-shard Modal Dict checkpoints."""
 
+# decisions.py imports _predict_file lazily inside the Modal worker.
+# pyright: reportImportCycles=false
+
 import json
 from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
@@ -80,7 +83,8 @@ def predict_dataset(input_path: str | Path, output_path: str | Path, *,
                         upload.put_file(shard, path)
             with modal.enable_output(), app.run():
                 download_model.remote()
-                worker = Decisions.with_options(
+                # Modal types app.cls as the bare class; at runtime it is a modal.Cls.
+                worker = Decisions.with_options(  # pyright: ignore[reportAttributeAccessIssue]
                     max_containers=max_containers,
                     env={RUN_STARTED_AT_ENV: str(started_at)},
                 )()

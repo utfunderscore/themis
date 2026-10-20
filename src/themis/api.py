@@ -8,7 +8,10 @@ from threading import Lock
 from typing import Annotated, Protocol
 
 from fastapi import Body, FastAPI
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, StrictStr
+
+PAGE = Path(__file__).parent / "static" / "index.html"
 
 
 class Predictor(Protocol):
@@ -68,6 +71,11 @@ def create_app(
     app = FastAPI(
         title="Themis Batch Inference API", version="1.0.0", lifespan=lifespan,
     )
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def tester() -> HTMLResponse:
+        """Serve the browser test page for trying the classifier."""
+        return HTMLResponse(PAGE.read_text(encoding="utf-8"))
 
     @app.post("/v1/inference", response_model=list[ChatScores], operation_id="batchInference")
     def infer(chats: Annotated[list[Chat], Body(max_length=256)]) -> list[ChatScores]:

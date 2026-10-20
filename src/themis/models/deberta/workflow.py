@@ -1,8 +1,10 @@
 """Cached training, artifact download, and ONNX export for the DeBERTa student."""
 
 import json
+from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
+from typing import Any
 
 from . import BASE_MODEL
 from .dataset import prepare_dataset as prepare_training_dataset
@@ -122,7 +124,7 @@ def correct_student(
     *,
     teacher_split_directory: str | Path = "cache/deberta/review-splits",
     correction_data_directory: str | Path = "cache/deberta/correction-splits",
-    config: dict[str, object] | None = None,
+    config: Mapping[str, object] | None = None,
 ) -> Path:
     """Post-train a distilled student on reviewed labels; return the new model path.
 
@@ -171,7 +173,7 @@ def train_student_locally(
     *,
     training_data_directory: str | Path = "cache/deberta/review-splits",
     output_directory: str | Path = "cache/deberta/local-run",
-    config: dict[str, object] | None = None,
+    config: Mapping[str, object] | None = None,
 ) -> Path:
     """Train BASE_MODEL from scratch on this machine; return the model path.
 
@@ -190,7 +192,7 @@ def train_student_locally(
             print(f"Reusing training splits: {splits}", flush=True)
         else:
             prepare_training_dataset(source_path=source, output_directory=splits)
-        train(splits, output, config=TrainingConfig(**{**(config or {}), "model_name": BASE_MODEL}))
+        train(splits, output, config=TrainingConfig.from_mapping({**(config or {}), "model_name": BASE_MODEL}))
     _print_run_metrics("Training metrics", _read_json(output / "metrics.json"))
     return output / "model"
 
@@ -202,7 +204,7 @@ def correct_student_locally(
     teacher_split_directory: str | Path = "cache/deberta/review-splits",
     correction_data_directory: str | Path = "cache/deberta/correction-splits",
     output_directory: str | Path = "cache/deberta/local-correction-run",
-    config: dict[str, object] | None = None,
+    config: Mapping[str, object] | None = None,
 ) -> Path:
     """Post-train a trained student on this machine (see correct_student); return the model path.
 
@@ -221,7 +223,7 @@ def correct_student_locally(
             print(f"Reusing correction splits: {splits}", flush=True)
         else:
             prepare_correction_dataset(labeled_path, teacher_split_directory, splits)
-        settings = TrainingConfig(**{**CORRECTION_TRAINING, **(config or {}), "model_name": init_model})
+        settings = TrainingConfig.from_mapping({**CORRECTION_TRAINING, **(config or {}), "model_name": init_model})
         train(splits, output, config=settings)
     _print_run_metrics("Post-training metrics", _read_json(output / "metrics.json"))
     return output / "model"
@@ -232,7 +234,7 @@ def compare_correction_locally(
     corrected_directory: str | Path,
     *,
     correction_data_directory: str | Path = "cache/deberta/correction-splits",
-    config: dict[str, object] | None = None,
+    config: Mapping[str, object] | None = None,
 ) -> dict[str, dict[str, dict[str, float]]]:
     """Compare the distilled and post-trained students on the correction test splits.
 
@@ -256,7 +258,7 @@ def compare_correction_locally(
         from .training import TrainingConfig, evaluate
 
         directory = Path(correction_data_directory)
-        settings = TrainingConfig(**{**(config or {}), "model_name": baseline})
+        settings = TrainingConfig.from_mapping({**(config or {}), "model_name": baseline})
         distilled = evaluate(model_directory, {split: directory / f"{split}.parquet" for split in splits},
                              config=settings)
         temporary = cache.with_suffix(".json.tmp")
@@ -270,12 +272,12 @@ def compare_correction_locally(
     return comparison
 
 
-def _print_run_metrics(title: str, metrics: dict | None) -> None:
-    if metrics:
+def _print_run_metrics(title: str, metrics: object) -> None:
+    if isinstance(metrics, Mapping) and metrics:
         print(f"{title}\n{format_run_metrics(metrics)}", flush=True)
 
 
-def _read_json(path: Path) -> dict:
+def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -291,7 +293,7 @@ def _completed_local_run(output: Path, model_name: str) -> bool:
     raise FileExistsError(f"{output} holds an incomplete run or one from {trained}; move it aside to retrain")
 
 
-def download_student(result: dict, cache_directory: str | Path = "cache/deberta/runs") -> Path:
+def download_student(result: Mapping[str, Any], cache_directory: str | Path = "cache/deberta/runs") -> Path:
     """Atomically cache model/tokenizer and run config from the exact training receipt."""
     run_id = result["run_id"]
     if not isinstance(run_id, str) or len(run_id) != 32 or any(c not in "0123456789abcdef" for c in run_id):

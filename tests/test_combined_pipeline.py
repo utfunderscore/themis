@@ -1,5 +1,8 @@
 import json
 import unittest
+
+# unittest fixtures are assigned in setUp rather than __init__.
+# pyright: reportUninitializedInstanceVariable=false
 from contextlib import chdir
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -52,10 +55,15 @@ class CombinedPipelineTests(unittest.TestCase):
         patcher = patch("themis.pipeline.train_student_locally")
         self.training = patcher.start()
         self.addCleanup(patcher.stop)
-        for name in ("correct_student_locally", "export_if_missing", "compare_correction_locally"):
-            patcher = patch(f"themis.pipeline.{name}")
-            setattr(self, name, patcher.start())
-            self.addCleanup(patcher.stop)
+        patcher = patch("themis.pipeline.correct_student_locally")
+        self.correct_student_locally = patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch("themis.pipeline.export_if_missing")
+        _ = patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch("themis.pipeline.compare_correction_locally")
+        self.compare_correction_locally = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_pipeline_scores_sample_and_reuses_completed_predictions(self):
         from themis.models.decision.perplexity.questions import CATEGORY_QUESTION

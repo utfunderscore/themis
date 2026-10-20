@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Themis classifier tester</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --other: #c3c2b7;
+    --allow: #006300;
+    --review: #d03b3b;
+    --focus: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --grid: #2c2c2a;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --other: #4a4a46;
+      --allow: #0ca30c;
+      --review: #e66767;
+      --focus: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px 64px;
+    background: var(--page);
+    color: var(--ink);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .sub { margin: 4px 0 0; color: var(--ink-2); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 8px; }
+  textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--page);
+    color: var(--ink);
+    font: inherit;
+  }
+  textarea:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .error { color: var(--review); font-weight: 600; }
+  .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .chat { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .action { white-space: nowrap; font-size: 13px; font-weight: 600; }
+  .action.allow { color: var(--allow); }
+  .action.review { color: var(--review); }
+  .bars { margin-top: 12px; display: grid; gap: 6px; }
+  .bar { display: grid; grid-template-columns: 84px 1fr 52px; gap: 10px; align-items: center; }
+  .bar .name { color: var(--ink-2); font-size: 13px; }
+  .bar .value { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .bar.top .name, .bar.top .value { color: var(--ink); font-weight: 600; }
+  .track {
+    height: 14px;
+    background-image: linear-gradient(to right, var(--grid) 1px, transparent 1px);
+    background-size: 25% 100%;
+    border-right: 1px solid var(--grid);
+  }
+  .fill {
+    height: 100%;
+    min-width: 1px;
+    background: var(--other);
+    border-radius: 0 4px 4px 0;
+    transition: width 0.25s ease;
+  }
+  .bar.top .fill { background: var(--accent); }
+  .axis { display: grid; grid-template-columns: 84px 1fr 52px; gap: 10px; margin-top: 4px; color: var(--muted); font-size: 11px; }
+  .ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+  @media (forced-colors: active) { .fill { background: CanvasText; } .bar:not(.top) .fill { background: GrayText; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Themis classifier tester</h1>
+    <p class="sub">Type chat messages, one per line, and see how the model scores each category.</p>
+  </header>
+
+  <form class="card" id="form">
+    <label for="chats">Chat messages</label>
+    <textarea id="chats" placeholder="good game everyone&#10;you played terribly&#10;..." autofocus></textarea>
+    <div class="row">
+      <button type="submit" id="submit">Classify</button>
+      <span class="hint">One message per line, up to 256. Ctrl/Cmd+Enter also submits.</span>
+      <span class="error" id="error" role="alert"></span>
+    </div>
+  </form>
+
+  <section id="results" aria-live="polite" style="display: grid; gap: 16px"></section>
+</main>
+
+<script>
+const form = document.getElementById("form");
+const input = document.getElementById("chats");
+const button = document.getElementById("submit");
+const errorBox = document.getElementById("error");
+const results = document.getElementById("results");
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+const percent = (p) => (p * 100).toFixed(p > 0 && p < 0.001 ? 2 : 1) + "%";
+
+function renderCard(chat, result) {
+  const card = el("article", "card");
+  const head = el("div", "result-head");
+  head.append(el("p", "chat", chat));
+  const review = result.action === "block_and_review";
+  head.append(el("span", "action " + (review ? "review" : "allow"),
+    (review ? "⚠ Block and review" : "✓ Allow")));
+  card.append(head);
+
+  const bars = el("div", "bars");
+  bars.setAttribute("role", "list");
+  // Fixed label order from the model, so a category keeps its position across chats.
+  for (const [name, p] of Object.entries(result.category_probabilities)) {
+    const row = el("div", "bar" + (name === result.category ? " top" : ""));
+    row.setAttribute("role", "listitem");
+    row.title = `${name}: ${percent(p)}`;
+    const track = el("div", "track");
+    const fill = el("div", "fill");
+    fill.style.width = (p * 100) + "%";
+    track.append(fill);
+    row.append(el("span", "name", name), track, el("span", "value", percent(p)));
+    bars.append(row);
+  }
+  card.append(bars);
+
+  const axis = el("div", "axis");
+  const ticks = el("div", "ticks");
+  for (const t of ["0%", "25%", "50%", "75%", "100%"]) ticks.append(el("span", "", t));
+  axis.append(el("span"), ticks, el("span"));
+  card.append(axis);
+  return card;
+}
+
+async function classify() {
+  const chats = input.value.split("\n").map((line) => line.trim()).filter(Boolean);
+  errorBox.textContent = "";
+  if (!chats.length) { results.replaceChildren(); return; }
+  button.disabled = true;
+  button.textContent = "Classifying…";
+  try {
+    const response = await fetch("/v1/inference", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(chats),
+    });
+    if (!response.ok) {
+      throw new Error(response.status === 422
+        ? "Invalid input: up to 256 messages of 1–16,384 characters."
+        : `Request failed (HTTP ${response.status}).`);
+    }
+    const scores = await response.json();
+    results.replaceChildren(...scores.map((s, i) => renderCard(chats[i], s)));
+  } catch (error) {
+    errorBox.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Classify";
+  }
+}
+
+form.addEventListener("submit", (event) => { event.preventDefault(); classify(); });
+input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); classify(); }
+});
+</script>
+</body>
+</html>

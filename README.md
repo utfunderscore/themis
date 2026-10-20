@@ -30,6 +30,10 @@ returns `[]`; invalid requests return HTTP 422. Model token limits still apply
 and longer chats are truncated by the tokenizer. Inference requests share the
 model serially, with an internal batch size of 32.
 
+Open `http://127.0.0.1:8000/` for a simple test page: enter chats one per line
+and see each one's category probabilities as a bar chart, with the predicted
+category highlighted and the recommended action shown.
+
 Interactive docs: `http://127.0.0.1:8000/docs`. The OpenAPI definition is checked
 in as [`openapi.json`](openapi.json) and served at `/openapi.json`.
 

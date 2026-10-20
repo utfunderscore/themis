@@ -3,11 +3,12 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING
 
 HAS_TRAINING = all(importlib.util.find_spec(name) is not None
                    for name in ("torch", "transformers"))
 
-if HAS_TRAINING:
+if TYPE_CHECKING or HAS_TRAINING:
     import torch
     from transformers import BertTokenizer, DebertaV2Config, DebertaV2ForSequenceClassification
 
@@ -51,7 +52,7 @@ class DebertaInferenceTests(unittest.TestCase):
                 self.assertAlmostEqual(result["action_probabilities"]["allow"], 0.2689414)
             self.assertEqual(inference.predict([]), [])
             with self.assertRaises(TypeError):
-                inference.predict("hello")
+                inference.predict("hello")  # pyright: ignore[reportArgumentType]
             with self.assertRaises(ValueError):
                 inference.predict(texts, batch_size=0)
             with self.assertRaises(ValueError):

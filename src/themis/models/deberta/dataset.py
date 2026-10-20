@@ -1,8 +1,10 @@
 """Create train/validation/test Parquet files from the local teacher dataset."""
 
 import json
+from collections.abc import Mapping
 from math import isfinite
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 
@@ -10,7 +12,7 @@ LABELS = ("none", "profanity", "insult", "slur", "sexual", "threat")
 ACTION_LABELS = ("allow", "block_and_review")
 
 
-def _targets(record: dict, labels: tuple[str, ...]) -> list[float]:
+def _targets(record: Mapping[str, Any], labels: tuple[str, ...]) -> list[float]:
     probabilities = record["decision"]["answer"]["probabilities"]
     if not isinstance(probabilities, dict) or set(probabilities) != set(labels):
         raise ValueError(f"Expected probabilities for {labels}")

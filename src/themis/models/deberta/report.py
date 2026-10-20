@@ -33,10 +33,11 @@ def format_comparison(
         old, new = _strip(before[split], split), _strip(after[split], split)
         rows = []
         for name in _metric_names((old, new)):
-            change = (f"{new[name] - old[name]:+.4f}"
-                      if isinstance(old.get(name), (int, float)) and isinstance(new.get(name), (int, float))
+            old_value, new_value = old.get(name), new.get(name)
+            change = (f"{new_value - old_value:+.4f}"
+                      if isinstance(old_value, (int, float)) and isinstance(new_value, (int, float))
                       else "-")
-            rows.append([name, _number(old.get(name)), _number(new.get(name)), change])
+            rows.append([name, _number(old_value), _number(new_value), change])
         tables.append(f"{split}\n{_table(['metric', *labels, 'change'], rows)}")
     return "\n\n".join(tables)
 
