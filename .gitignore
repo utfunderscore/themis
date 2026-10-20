@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 cache/
 2b2t-dataset/
+moderation_audit/all_samples.jsonl
 java/.gradle/
 java/**/build/
 java/**/bin/
