@@ -16,7 +16,8 @@ import sentencepiece.SentencepieceModel.TrainerSpec;
 
 /**
  * SentencePiece unigram encoder matching the reference implementation's
- * Viterbi segmentation and byte fallback. Immutable and thread safe.
+ * Viterbi segmentation, user-defined symbols and byte fallback. Immutable and
+ * thread safe.
  */
 final class SentencePiece {
 
@@ -34,7 +35,8 @@ final class SentencePiece {
     }
 
     private final SentencePieceNormalizer normalizer;
-    private final Map<String, Integer> normalPieces = new HashMap<>();
+    /** Normal and user-defined pieces: the ones segmentation can choose. */
+    private final Map<String, Integer> vocabulary = new HashMap<>();
     private final float[] scores;
     private final int[] byteIds = new int[256];
     private final int unknownId;
@@ -49,17 +51,22 @@ final class SentencePiece {
         Arrays.fill(byteIds, -1);
         int unknown = -1;
         float minScore = Float.MAX_VALUE;
+        List<Integer> userDefined = new ArrayList<>();
         int longest = 0;
         boolean spaceOnlyLeading = true;
         for (int id = 0; id < pieces.size(); id++) {
             Piece piece = pieces.get(id);
             scores[id] = piece.score();
             switch (piece.type()) {
-                case NORMAL -> {
-                    if (normalPieces.putIfAbsent(piece.piece(), id) != null) {
+                case NORMAL, USER_DEFINED -> {
+                    if (vocabulary.putIfAbsent(piece.piece(), id) != null) {
                         throw new IllegalArgumentException("Duplicate piece " + piece.piece());
                     }
-                    minScore = Math.min(minScore, piece.score());
+                    if (piece.type() == NORMAL) {
+                        minScore = Math.min(minScore, piece.score());
+                    } else {
+                        userDefined.add(id);
+                    }
                     longest = Math.max(longest, piece.piece().length());
                     spaceOnlyLeading &= piece.piece().indexOf(SPACE_SYMBOL, 1) < 0;
                 }
@@ -67,9 +74,14 @@ final class SentencePiece {
                 case BYTE -> byteIds[parseByte(piece.piece())] = id;
                 case CONTROL, UNUSED -> {
                 }
-                case USER_DEFINED -> throw new IllegalArgumentException("User-defined pieces are not supported");
                 default -> throw new IllegalArgumentException("Unknown piece type " + piece.type());
             }
+        }
+        // User-defined pieces score by UTF-8 length instead, so they are
+        // always selected (SentencePiece 0.2.2's GetUserDefinedScore).
+        for (int id : userDefined) {
+            int length = pieces.get(id).piece().getBytes(StandardCharsets.UTF_8).length;
+            scores[id] = (float) (0.1 * (length - 1));
         }
         if (unknown < 0) {
             throw new IllegalArgumentException("Model has no unknown piece");
@@ -102,13 +114,17 @@ final class SentencePiece {
             throw new IllegalArgumentException("treat_whitespace_as_suffix is not supported");
         }
         List<Piece> pieces = new ArrayList<>(model.getPiecesCount());
+        List<String> userDefinedSymbols = new ArrayList<>();
         for (ModelProto.SentencePiece piece : model.getPiecesList()) {
             if (piece.getUnknownFields().hasField(ModelProto.SentencePiece.TYPE_FIELD_NUMBER)) {
                 throw new IllegalArgumentException("Unknown piece type");
             }
             pieces.add(new Piece(piece.getPiece(), piece.getScore(), piece.getType().getNumber()));
+            if (piece.getType().getNumber() == USER_DEFINED) {
+                userDefinedSymbols.add(piece.getPiece());
+            }
         }
-        SentencePieceNormalizer normalizer = readNormalizer(model.getNormalizerSpec());
+        SentencePieceNormalizer normalizer = readNormalizer(model.getNormalizerSpec(), userDefinedSymbols);
         return new SentencePiece(pieces, normalizer);
     }
 
@@ -155,7 +171,7 @@ final class SentencePiece {
             boolean hasSingleCharacter = false;
             int lastEnd = Math.min(length, start + maxPieceLength);
             for (int end = start + 1; end <= lastEnd; end++) {
-                Integer id = normalPieces.get(normalized.substring(start, end));
+                Integer id = vocabulary.get(normalized.substring(start, end));
                 if (id == null) {
                     continue;
                 }
@@ -210,12 +226,13 @@ final class SentencePiece {
         return normalized.substring(start, end).getBytes(StandardCharsets.UTF_8).length;
     }
 
-    private static SentencePieceNormalizer readNormalizer(NormalizerSpec spec) {
+    private static SentencePieceNormalizer readNormalizer(NormalizerSpec spec, List<String> userDefinedSymbols) {
         if (!spec.getNormalizationRuleTsv().isEmpty()) {
             throw new IllegalArgumentException("normalization_rule_tsv is not supported");
         }
         return new SentencePieceNormalizer(spec.getPrecompiledCharsmap().toByteArray(),
-                spec.getAddDummyPrefix(), spec.getRemoveExtraWhitespaces(), spec.getEscapeWhitespaces());
+                spec.getAddDummyPrefix(), spec.getRemoveExtraWhitespaces(), spec.getEscapeWhitespaces(),
+                userDefinedSymbols);
     }
 
     private static int parseByte(String piece) {

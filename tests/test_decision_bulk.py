@@ -1,5 +1,8 @@
 """Exercise interruption and resume with in-memory Modal substitutes."""
 
+# unittest fixtures are assigned in setUp rather than __init__.
+# pyright: reportUninitializedInstanceVariable=false
+
 import json
 import unittest
 from contextlib import ExitStack, nullcontext

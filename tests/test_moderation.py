@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
 import modal
 
-from themis import moderation
-from themis.moderation import _job_manifest, _report_progress, _split_dataset, moderate_dataset
+from themis.models.koala import moderation
+from themis.models.koala.moderation import _job_manifest, _report_progress, _split_dataset, moderate_dataset
 
 # White-box tests intentionally exercise internal checkpoint/progress helpers.
 # pyright: reportPrivateUsage=false
@@ -246,13 +246,13 @@ class DatasetTests(unittest.TestCase):
     def test_progress_aggregates_workers_and_uses_interval_rate(self) -> None:
         progress = {"shard-a": 8, "shard-b": 4}
         with (
-            patch("themis.moderation.monotonic", side_effect=[10, 14, 16]),
-            patch("themis.moderation.Thread") as thread,
+            patch("themis.models.koala.moderation.monotonic", side_effect=[10, 14, 16]),
+            patch("themis.models.koala.moderation.Thread") as thread,
             patch("builtins.print") as output,
         ):
             with _report_progress(progress, 20, 30):
                 # Run one scheduled report, then stop the monitor loop.
-                with patch("themis.moderation.Event.wait", side_effect=[False, True]):
+                with patch("themis.models.koala.moderation.Event.wait", side_effect=[False, True]):
                     assert thread.call_args is not None
                     cast(Callable[[], None], thread.call_args.kwargs["target"])()
                 progress["shard-a"] = 12

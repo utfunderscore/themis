@@ -3,6 +3,7 @@ import math
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 from unittest.mock import patch
 
 from themis.datasets.sampling import guided_sample_dataset
@@ -149,18 +150,40 @@ class GuidedSamplingTests(unittest.TestCase):
                 guided_sample_dataset(source, output, {"absent": 1})
             self.assertFalse(output.exists())
 
+    def test_reuse_survives_moving_the_source(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "old" / "source.jsonl", root / "sample.jsonl"
+            source.parent.mkdir()
+            self.write_rows(source, self.make_rows())
+            guided_sample_dataset(source, output, {"A": 1}, seed=3)
+            manifest = output.with_name(output.name + ".manifest.json")
+            saved = json.loads(manifest.read_text())
+            self.assertEqual(saved["source_path"], str(source.resolve()))
+            # Manifests written before this change stored the path inside config.
+            saved["config"]["source_path"] = str(source.resolve())
+            manifest.write_text(json.dumps(saved))
+            moved = root / "new" / "source.jsonl"
+            moved.parent.mkdir()
+            source.rename(moved)
+            before = output.read_bytes()
+            self.assertEqual(guided_sample_dataset(moved, output, {"A": 1}, seed=3), output)
+            self.assertEqual(output.read_bytes(), before)
+            with self.assertRaises(FileExistsError):
+                guided_sample_dataset(moved, output, {"A": 1}, seed=4)
+
     def test_configuration_and_source_path_validation(self):
         with TemporaryDirectory() as directory:
             source, output = Path(directory) / "source.jsonl", Path(directory) / "sample.jsonl"
             self.write_rows(source, self.make_rows())
             for quotas in ({}, {"A": 0}, {"A": -1}, {"A": True}, {"A": 1.5}, {"": 1}):
                 with self.subTest(quotas=quotas), self.assertRaises(ValueError):
-                    guided_sample_dataset(source, output, quotas)
+                    guided_sample_dataset(source, output, quotas)  # pyright: ignore[reportArgumentType]
             for options in ({"seed": True}, {"ambiguous_fraction": math.nan}, {"long_fraction": -0.1},
                             {"ambiguous_fraction": 0.8, "long_fraction": 0.3},
                             {"metadata_field": "content"}, {"score_field": ""}):
                 with self.subTest(options=options), self.assertRaises(ValueError):
-                    guided_sample_dataset(source, output, {"A": 1}, **options)
+                    guided_sample_dataset(source, output, {"A": 1}, **options)  # pyright: ignore[reportArgumentType]
             with self.assertRaises(ValueError):
                 guided_sample_dataset(source, source, {"A": 1})
 
@@ -168,7 +191,7 @@ class GuidedSamplingTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             source, output = Path(directory) / "source.jsonl", Path(directory) / "sample.jsonl"
             self.write_rows(source, [{"text": "🌍", "scores": {"A": 1.0}, "sampling": "preserved"}])
-            options = {"text_field": "text", "score_field": "scores", "metadata_field": "selection"}
+            options: dict[str, Any] = {"text_field": "text", "score_field": "scores", "metadata_field": "selection"}
             guided_sample_dataset(source, output, {"A": 1}, **options)
             selected = self.load_rows(output)[0]
             self.assertEqual(selected["sampling"], "preserved")

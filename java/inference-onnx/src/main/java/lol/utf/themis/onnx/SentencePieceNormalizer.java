@@ -4,10 +4,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Port of SentencePiece's normalizer: applies a precompiled charsmap (a
  * darts-clone double-array trie over UTF-8 bytes) and its whitespace rules.
+ * User-defined symbols are passed through unnormalized.
  */
 final class SentencePieceNormalizer {
 
@@ -19,13 +21,26 @@ final class SentencePieceNormalizer {
     private final boolean addDummyPrefix;
     private final boolean removeExtraWhitespaces;
     private final boolean escapeWhitespaces;
+    private final byte[][] userDefinedSymbols;
+    /** Whether any user-defined symbol starts with a given byte. */
+    private final boolean[] userDefinedFirstBytes = new boolean[256];
 
     /** An empty charsmap leaves characters unchanged. */
     SentencePieceNormalizer(byte[] precompiledCharsmap, boolean addDummyPrefix,
-                            boolean removeExtraWhitespaces, boolean escapeWhitespaces) {
+                            boolean removeExtraWhitespaces, boolean escapeWhitespaces,
+                            List<String> userDefinedSymbols) {
         this.addDummyPrefix = addDummyPrefix;
         this.removeExtraWhitespaces = removeExtraWhitespaces;
         this.escapeWhitespaces = escapeWhitespaces;
+        this.userDefinedSymbols = new byte[userDefinedSymbols.size()][];
+        for (int i = 0; i < userDefinedSymbols.size(); i++) {
+            byte[] symbol = userDefinedSymbols.get(i).getBytes(StandardCharsets.UTF_8);
+            if (symbol.length == 0) {
+                throw new IllegalArgumentException("User-defined symbols must not be empty");
+            }
+            this.userDefinedSymbols[i] = symbol;
+            userDefinedFirstBytes[symbol[0] & 0xFF] = true;
+        }
         if (precompiledCharsmap.length == 0) {
             trie = null;
             replacements = new byte[0];
@@ -94,7 +109,10 @@ final class SentencePieceNormalizer {
         return new String(output.bytes, 0, output.size, StandardCharsets.UTF_8);
     }
 
-    /** The replacement for the longest charsmap rule matching at a position. */
+    /**
+     * The longest user-defined symbol at a position, unchanged, else the
+     * replacement for the longest charsmap rule matching there.
+     */
     private final class Prefix {
         byte[] source;
         int from;
@@ -102,6 +120,14 @@ final class SentencePieceNormalizer {
         int consumed;
 
         void match(byte[] input, int position) {
+            int symbolLength = userDefinedSymbolLength(input, position);
+            if (symbolLength > 0) {
+                source = input;
+                from = position;
+                to = position + symbolLength;
+                consumed = symbolLength;
+                return;
+            }
             int longestLength = 0;
             int longestValue = 0;
             if (trie != null) {
@@ -150,6 +176,21 @@ final class SentencePieceNormalizer {
         boolean isSingleSpace() {
             return to - from == 1 && source[from] == ' ';
         }
+    }
+
+    private int userDefinedSymbolLength(byte[] input, int position) {
+        int longest = 0;
+        if (!userDefinedFirstBytes[input[position] & 0xFF]) {
+            return longest;
+        }
+        for (byte[] symbol : userDefinedSymbols) {
+            int end = position + symbol.length;
+            if (symbol.length > longest && end <= input.length
+                    && Arrays.equals(input, position, end, symbol, 0, symbol.length)) {
+                longest = symbol.length;
+            }
+        }
+        return longest;
     }
 
     private final class Output {

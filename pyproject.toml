@@ -13,6 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+api = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1"]
 onnx = ["onnx>=1.17,<2", "onnxruntime>=1.20,<2"]
 training = [
     "numpy>=2,<3",
@@ -53,5 +54,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28,<1",
+    "pytest>=8,<10",
     "basedpyright>=1.40.2",
 ]

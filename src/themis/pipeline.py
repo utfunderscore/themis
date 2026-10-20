@@ -9,7 +9,12 @@ from themis.datasets.download_minecraft_server_chat import (
 )
 from themis.datasets.review import generate_review_dataset
 from themis.datasets.sampling import guided_sample_dataset
-from themis.models.deberta.workflow import train_and_export
+from themis.models.deberta.workflow import (
+    compare_correction_locally,
+    correct_student_locally,
+    export_if_missing,
+    train_student_locally,
+)
 from themis.models.decision.perplexity.bulk import predict_dataset
 from themis.models.decision.perplexity.dataset import prepare_dataset
 from themis.models.decision.perplexity.questions import CATEGORY_QUESTION
@@ -17,7 +22,7 @@ from themis.models.koala.moderation import moderate_dataset
 
 
 def pipeline():
-    """Score 100k chats for category and review, then train the DeBERTa student."""
+    """Score 100k chats for category and review, train and post-train the DeBERTa student, then compare them."""
     deduplicated = Path("cache/combined_chats_deduplicated.jsonl")
     koala_predictions = Path("cache/combined_chats_moderated.jsonl")
     sample = Path("cache/combined_chats_inference_sample_100k.jsonl")
@@ -89,10 +94,29 @@ def pipeline():
             rows_per_shard=1024,
             max_containers=4,
         )
-    train_and_export(
+    # Train locally from scratch: the student is now mDeBERTa, not DeBERTa-v3.
+    model_directory = train_student_locally(
         source=review_decisions,
         training_data_directory="cache/deberta/review-splits",
-        onnx_output_directory=None,
+        output_directory="cache/deberta/local-run",
+        config={"bf16": True},
+    )
+    _ = export_if_missing(model_directory)
+    # Post-train the distilled student on reviewed labels the teacher got wrong.
+    corrected_directory = correct_student_locally(
+        labeled_path=Path("moderation_audit/all_samples.jsonl"),
+        model_directory=model_directory,
+        teacher_split_directory="cache/deberta/review-splits",
+        output_directory="cache/deberta/local-correction-run",
+        config={"bf16": True},
+    )
+    _ = export_if_missing(corrected_directory)
+    # Does post-training help on held-out reviewed labels without forgetting the teacher?
+    _ = compare_correction_locally(
+        model_directory=model_directory,
+        corrected_directory=corrected_directory,
+        correction_data_directory="cache/deberta/correction-splits",
+        config={"bf16": True},
     )
     print("Pipeline complete.", flush=True)
 

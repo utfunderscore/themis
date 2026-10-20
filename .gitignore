@@ -6,3 +6,4 @@ cache/
 java/.gradle/
 java/**/build/
 java/**/bin/
+java/**/.gradle/

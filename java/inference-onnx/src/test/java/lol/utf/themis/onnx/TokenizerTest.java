@@ -28,6 +28,10 @@ class TokenizerTest {
     }
 
     private static SentencePiece model(boolean addDummyPrefix, List<String> extraPieces) {
+        return model(addDummyPrefix, extraPieces, List.of());
+    }
+
+    private static SentencePiece model(boolean addDummyPrefix, List<String> extraPieces, List<String> userDefined) {
         List<SentencePiece.Piece> pieces = new ArrayList<>();
         pieces.add(new SentencePiece.Piece("[PAD]", 0, SentencePiece.CONTROL));
         pieces.add(new SentencePiece.Piece("[CLS]", 0, SentencePiece.CONTROL));
@@ -42,7 +46,11 @@ class TokenizerTest {
         for (String extra : extraPieces) {
             pieces.add(new SentencePiece.Piece(extra, -10, SentencePiece.NORMAL));
         }
-        return new SentencePiece(pieces, new SentencePieceNormalizer(new byte[0], addDummyPrefix, true, true));
+        for (String symbol : userDefined) {
+            pieces.add(new SentencePiece.Piece(symbol, 0, SentencePiece.USER_DEFINED));
+        }
+        return new SentencePiece(pieces,
+                new SentencePieceNormalizer(new byte[0], addDummyPrefix, true, true, userDefined));
     }
 
     private static int piece(String piece) {
@@ -98,6 +106,20 @@ class TokenizerTest {
         SentencePiece spanning = model(true, List.of("o▁w"));
         String text = "hello world hello world";
         assertArrayEquals(spanning.encode(text), spanning.encode(text, 1));
+    }
+
+    @Test
+    void prefersUserDefinedPieces() {
+        SentencePiece model = model(true, List.of(), List.of("<x>", "▁hel"));
+        int x = FIRST_NORMAL + NORMAL.size();
+        int hel = x + 1;
+        assertArrayEquals(new int[] {piece("▁"), x, piece("▁hello")}, model.encode("<x> hello"));
+        assertArrayEquals(new int[] {hel, piece("l")}, model.encode("hell"));
+    }
+
+    @Test
+    void rejectsDuplicateUserDefinedPieces() {
+        assertThrows(IllegalArgumentException.class, () -> model(true, List.of(), List.of("▁hello")));
     }
 
     @Test

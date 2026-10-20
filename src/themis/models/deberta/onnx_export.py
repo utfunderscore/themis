@@ -7,6 +7,7 @@ pass either the training output directory or its model/ subdirectory.
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import cast
 
 
 def export_onnx(
@@ -27,6 +28,7 @@ def export_onnx(
         raise FileExistsError(destination)
 
     import numpy as np
+    import numpy.typing as npt
     import onnx
     import onnxruntime as ort
     import torch
@@ -87,7 +89,7 @@ def export_onnx(
             arrays = {name: inputs[name].numpy() for name in ("input_ids", "attention_mask")}
             with torch.inference_mode():
                 expected = wrapper(inputs["input_ids"], inputs["attention_mask"]).numpy()
-            actual = session.run(["logits"], arrays)[0]
+            actual = cast(npt.NDArray[np.float32], session.run(["logits"], arrays)[0])
             if not np.isfinite(actual).all() or not np.isfinite(expected).all():
                 raise ValueError("Non-finite logits during ONNX validation")
             np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-4)

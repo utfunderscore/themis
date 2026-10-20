@@ -2,9 +2,10 @@
 license: mit
 language:
 - en
+- multilingual
 library_name: transformers
 pipeline_tag: text-classification
-base_model: microsoft/deberta-v3-base
+base_model: microsoft/mdeberta-v3-base
 tags:
 - text-classification
 - content-moderation
@@ -12,23 +13,25 @@ tags:
 - synthetic-data
 - minecraft
 - deberta-v3
+- mdeberta-v3
 - onnx
 datasets:
 - declip/Minecraft-Server-Chat
 ---
 
-# Themis: DeBERTa-v3 Minecraft chat moderation
+# Themis: mDeBERTa-v3 Minecraft chat moderation
 
 Themis is a small, fast moderation model for Minecraft chat. It is
-[`microsoft/deberta-v3-base`](https://huggingface.co/microsoft/deberta-v3-base),
-fine-tuned on **synthetic labels produced by a decision model**, in this case
+[`microsoft/mdeberta-v3-base`](https://huggingface.co/microsoft/mdeberta-v3-base),
+the multilingual DeBERTa-v3 (pretrained on 100 languages from CC100), fine-tuned on **synthetic labels produced by a decision model**, in this case
 Perplexity's
 [`perplexity-ai/pplx-decider-v1.1-27b`](https://huggingface.co/perplexity-ai/pplx-decider-v1.1-27b).
 
 The 27B decision model is accurate but expensive to run on every chat message.
 We used it once, offline, to label 100k real chat messages, then distilled its
-judgements into a 184M-parameter student. The student runs on a CPU at roughly
-87 messages/second (ONNX, batch size 1, Ryzen 5 7600X).
+judgements into a 279M-parameter student (an 86M-parameter transformer plus a
+250k-token multilingual embedding table). The student runs on a CPU at roughly
+TBD messages/second (ONNX, batch size 1, Ryzen 5 7600X).
 
 For each message, the model returns two independent predictions:
 
@@ -63,7 +66,7 @@ you next round" is ordinary gameplay trash talk.
    `block_and_review` it, separating banter and in-game threats from targeted
    abuse, hate speech and credible real-world threats. Again we kept the full
    probability distribution.
-5. **Distil.** DeBERTa-v3-base was trained on the message text alone, with no
+5. **Distil.** mDeBERTa-v3-base was trained on the message text alone, with no
    category hint. It has one 8-logit head: 6 category logits followed by 2
    action logits. The loss is the sum of two soft-target cross-entropies, one
    per task, against the teacher's probabilities. This teaches the student how
@@ -75,16 +78,18 @@ validation / 9,999 test.
 
 ### Training setup
 
+<!-- TBD values: fill in from the mDeBERTa run's metrics.json and benchmark_onnx. -->
+
 | Setting | Value |
 | --- | --- |
-| Base model | `microsoft/deberta-v3-base` @ `8ccc9b6f` |
+| Base model | `microsoft/mdeberta-v3-base` @ `a0484667` |
 | Teacher | `perplexity-ai/pplx-decider-v1.1-27b` @ `6195aa55`, unquantised BF16 |
 | Max sequence length | 256 tokens |
 | Epochs | 3 (best epoch chosen by validation loss) |
 | Optimiser | AdamW, lr 2e-5, weight decay 0.01, linear schedule, 10% warmup |
 | Batch size | 16 |
 | Precision | FP32 |
-| Hardware | 1× H100 (about 15 minutes) |
+| Hardware | 1× H100 (about TBD minutes) |
 
 ## Evaluation
 
@@ -94,25 +99,25 @@ They are not measured against human annotations.
 
 | Test metric | Category | Action |
 | --- | --- | --- |
-| Agreement with teacher | 93.6% | 95.2% |
-| Macro F1 | 0.840 | 0.920 |
-| KL(teacher ‖ student) | 0.063 | 0.037 |
+| Agreement with teacher | TBD | TBD |
+| Macro F1 | TBD | TBD |
+| KL(teacher ‖ student) | TBD | TBD |
 
 Per-class F1 on the test split:
 
 | Category | F1 |
 | --- | --- |
-| `none` | 0.968 |
-| `profanity` | 0.908 |
-| `insult` | 0.720 |
-| `slur` | 0.813 |
-| `sexual` | 0.891 |
-| `threat` | 0.742 |
+| `none` | TBD |
+| `profanity` | TBD |
+| `insult` | TBD |
+| `slur` | TBD |
+| `sexual` | TBD |
+| `threat` | TBD |
 
 | Action | F1 |
 | --- | --- |
-| `allow` | 0.971 |
-| `block_and_review` | 0.869 |
+| `allow` | TBD |
+| `block_and_review` | TBD |
 
 ## Usage
 
@@ -219,10 +224,14 @@ runs this bundle from Java 21 with ONNX Runtime.
   its mistakes and biases. The metrics above show fidelity to the teacher, not
   real-world accuracy.
 - **Domain.** Trained on Minecraft server chat: short, informal, mostly
-  English, full of game slang. Expect weaker results on other platforms,
-  long-form text or other languages.
+  English, full of game slang. Expect weaker results on other platforms or
+  long-form text.
+- **Other languages.** The multilingual base model tokenizes and represents
+  other languages far better than English-only DeBERTa-v3, but the distillation
+  labels are mostly English. Non-English performance relies on cross-lingual
+  transfer and has not been measured.
 - **Weaker classes.** `insult` and `threat` are the hardest categories
-  (F1 ≈ 0.72–0.74 against the teacher). Here, banter and real harassment are
+  (F1 ≈ TBD against the teacher). Here, banter and real harassment are
   hard to tell apart.
 - **No context.** Each message is classified alone, with no conversation
   history, sender or server rules.

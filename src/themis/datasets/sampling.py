@@ -109,7 +109,7 @@ def guided_sample_dataset(
     size, not source size. No libraries/models/remote services are required.
 
     Reuse requires matching configuration and SHA-256 checks of both source and
-    output. Existing unrelated, stale or incomplete artifacts are never replaced.
+    output; the source's path is recorded but not compared. Existing unrelated, stale or incomplete artifacts are never replaced.
     A .manifest.json sidecar records counts, hashes, seed and sampling policy.
     """
     source, destination = Path(source), Path(destination)
@@ -133,7 +133,7 @@ def guided_sample_dataset(
     labels = sorted(quotas)
     requested = {label: quotas[label] for label in labels}
     config = {
-        "version": SAMPLING_VERSION, "source_path": str(source.resolve()), "quotas": requested,
+        "version": SAMPLING_VERSION, "quotas": requested,
         "seed": seed, "ambiguous_fraction": ambiguous_fraction, "long_fraction": long_fraction,
         "text_field": text_field, "score_field": score_field, "metadata_field": metadata_field,
         "selection_order": ["ambiguous", "long", "random"],
@@ -145,7 +145,10 @@ def guided_sample_dataset(
         if not destination.is_file() or not manifest_path.is_file():
             raise FileExistsError("Sample/manifest incomplete; refusing to overwrite existing artifacts")
         saved = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if saved.get("config") != config:
+        # The source is identified by its SHA-256 below, not its path, so moving
+        # the repository keeps samples reusable. Older manifests stored the path here.
+        saved_config = {key: value for key, value in saved.get("config", {}).items() if key != "source_path"}
+        if saved_config != config:
             raise FileExistsError("Existing sample uses a different sampling configuration")
         if saved.get("source_sha256") != _sha256(source) or identity != _source_identity(source):
             raise ValueError("Existing sample source changed; choose a new destination")
@@ -247,7 +250,8 @@ def guided_sample_dataset(
                for label in labels):
             raise RuntimeError("Guided sampling tier counts do not match requested quotas")
         manifest = {
-            "config": config, "source_sha256": checksum.hexdigest(), "source_bytes": offset,
+            "config": config, "source_path": str(source.resolve()),
+            "source_sha256": checksum.hexdigest(), "source_bytes": offset,
             "source_rows": total, "available_categories": dict(available), "sample_rows": len(selected),
             "selected_tiers": {label: dict(actual[label]) for label in labels},
             "output_sha256": output_checksum.hexdigest(),

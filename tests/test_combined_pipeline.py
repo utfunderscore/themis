@@ -1,5 +1,8 @@
 import json
 import unittest
+
+# unittest fixtures are assigned in setUp rather than __init__.
+# pyright: reportUninitializedInstanceVariable=false
 from contextlib import chdir
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -49,8 +52,17 @@ class CombinedPipelineTests(unittest.TestCase):
         patcher = patch("themis.pipeline.generate_review_dataset")
         self.review = patcher.start()
         self.addCleanup(patcher.stop)
-        patcher = patch("themis.pipeline.train_and_export")
+        patcher = patch("themis.pipeline.train_student_locally")
         self.training = patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch("themis.pipeline.correct_student_locally")
+        self.correct_student_locally = patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch("themis.pipeline.export_if_missing")
+        _ = patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch("themis.pipeline.compare_correction_locally")
+        self.compare_correction_locally = patcher.start()
         self.addCleanup(patcher.stop)
 
     def test_pipeline_scores_sample_and_reuses_completed_predictions(self):
@@ -88,7 +100,14 @@ class CombinedPipelineTests(unittest.TestCase):
                 self.training.assert_called_once_with(
                     source=review_decisions,
                     training_data_directory="cache/deberta/review-splits",
-                    onnx_output_directory=None,
+                    output_directory="cache/deberta/local-run",
+                    config={"bf16": True},
+                )
+                self.compare_correction_locally.assert_called_once_with(
+                    model_directory=self.training.return_value,
+                    corrected_directory=self.correct_student_locally.return_value,
+                    correction_data_directory="cache/deberta/correction-splits",
+                    config={"bf16": True},
                 )
                 destination.write_text("completed output")
                 self.predict.reset_mock()

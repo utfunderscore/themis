@@ -1,5 +1,6 @@
 """Run the shared DeBERTa trainer on Modal without local training dependencies."""
 
+from collections.abc import Mapping
 from pathlib import Path
 from uuid import uuid4
 
@@ -31,7 +32,7 @@ image = (
     volumes={str(ROOT): volume},
     max_containers=1,
 )
-def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
+def train_remote(run_id: str, config: Mapping[str, object]) -> dict[str, object]:
     """Train uploaded splits and commit artifacts before returning their locations."""
     import torch
 
@@ -39,7 +40,7 @@ def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
 
     if len(run_id) != 32 or any(char not in "0123456789abcdef" for char in run_id):
         raise ValueError("run_id must be a lowercase UUID hex string")
-    settings = TrainingConfig(**config)
+    settings = TrainingConfig.from_mapping(config)
     if settings.use_cpu:
         raise ValueError("Modal training requires use_cpu=False")
     if not torch.cuda.is_available():
@@ -56,6 +57,7 @@ def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
         "volume_name": VOLUME_NAME,
         "output_directory": f"runs/{run_id}/output",
         "model_directory": f"runs/{run_id}/output/model",
+        "model_name": settings.model_name,
         "metrics": result["metrics"],
     }
 
@@ -63,25 +65,36 @@ def train_remote(run_id: str, config: dict[str, object]) -> dict[str, object]:
 def train(
     split_directory: str | Path,
     *,
-    config: dict[str, object] | None = None,
+    config: Mapping[str, object] | None = None,
+    init_model_directory: str | Path | None = None,
 ) -> dict[str, object]:
     """Upload prepared splits and wait for GPU training; return Volume paths/metrics.
 
     Config accepts TrainingConfig fields as a plain dictionary, so the caller
-    does not need PyTorch or Transformers installed. Every call creates a new run.
+    does not need PyTorch or Transformers installed. Extra Parquet files are
+    uploaded and evaluated too. init_model_directory, a local trained model
+    and tokenizer, is uploaded and continued from instead of config's
+    model_name. Every call creates a new run.
     """
     source = Path(split_directory)
     paths = [source / f"{split}.parquet" for split in ("train", "validation", "test")]
     for path in paths:
         if not path.is_file():
             raise FileNotFoundError(path)
+    paths += sorted(path for path in source.glob("*.parquet") if path not in paths)
     settings = dict(config or {})
     if settings.get("use_cpu"):
         raise ValueError("Modal training requires use_cpu=False")
+    if init_model_directory is not None and not (Path(init_model_directory) / "config.json").is_file():
+        raise FileNotFoundError(Path(init_model_directory) / "config.json")
     run_id = uuid4().hex
+    if init_model_directory is not None:
+        settings["model_name"] = str(ROOT / "runs" / run_id / "init_model")
     with modal.enable_output(), app.run():
         with volume.batch_upload() as upload:
             for path in paths:
                 upload.put_file(path, f"/runs/{run_id}/splits/{path.name}")
+            if init_model_directory is not None:
+                upload.put_directory(str(init_model_directory), f"/runs/{run_id}/init_model")
         print(f"DeBERTa run: {VOLUME_NAME}/runs/{run_id}", flush=True)
         return train_remote.remote(run_id, settings)

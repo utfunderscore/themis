@@ -1,8 +1,11 @@
 """Distill category and moderation action. Requires the ``training`` extra."""
 
 import json
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -18,12 +21,13 @@ from transformers import (
     set_seed,
 )
 
+from . import BASE_MODEL
 from .dataset import ACTION_LABELS, LABELS
 
 
 @dataclass(frozen=True)
 class TrainingConfig:
-    model_name: str = "microsoft/deberta-v3-base"
+    model_name: str = BASE_MODEL
     revision: str = "main"
     max_length: int = 256
     epochs: float = 3.0
@@ -57,8 +61,13 @@ class TrainingConfig:
         if self.use_cpu and self.fp16:
             raise ValueError("fp16 requires a supported accelerator")
 
+    @classmethod
+    def from_mapping(cls, values: Mapping[str, object]) -> "TrainingConfig":
+        """Build from untyped settings such as JSON; __post_init__ validates them."""
+        return cls(**cast(Mapping[str, Any], values))
 
-class SoftTargetDataset(Dataset):
+
+class SoftTargetDataset(Dataset[dict[str, object]]):
     """Validate prepared Parquet and tokenize once, leaving padding to batches."""
 
     def __init__(self, path: str | Path, tokenizer, max_length: int) -> None:
@@ -100,7 +109,7 @@ class SoftTargetDataset(Dataset):
     def __len__(self) -> int:
         return len(self.targets)
 
-    def __getitem__(self, index: int) -> dict:
+    def __getitem__(self, index: int) -> dict[str, object]:
         return {**{key: values[index] for key, values in self.encodings.items()},
                 "labels": self.targets[index].tolist()}
 
@@ -137,12 +146,12 @@ def multitask_loss(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
 
 def compute_metrics(prediction: EvalPrediction) -> dict[str, float]:
     metrics = {}
+    predictions, label_ids = np.asarray(prediction.predictions), np.asarray(prediction.label_ids)
     for name, start, stop, labels in (
         ("category", 0, len(LABELS), LABELS),
         ("action", len(LABELS), len(LABELS) + len(ACTION_LABELS), ACTION_LABELS),
     ):
-        task = EvalPrediction(predictions=prediction.predictions[:, start:stop],
-                              label_ids=prediction.label_ids[:, start:stop])
+        task = EvalPrediction(predictions=predictions[:, start:stop], label_ids=label_ids[:, start:stop])
         metrics.update({f"{name}_{key}": value for key, value in _task_metrics(task, labels).items()})
     return metrics
 
@@ -178,6 +187,9 @@ def train(
 ) -> dict[str, object]:
     """Train on train.parquet, select by validation loss, then evaluate test once.
 
+    Any other Parquet files in split_directory are also evaluated once, with
+    metrics keyed by file stem. config.model_name may be a local checkpoint
+    with the same eight outputs, which continues training it (post-training).
     Run on the current machine (CPU or GPU). Output must be a new directory.
     Returns artifact paths and metrics; checkpoints retain optimizer state.
     """
@@ -195,8 +207,10 @@ def train(
     )
     # The base tokenizer has no limit; save the trained one with ours.
     tokenizer.model_max_length = config.max_length
+    extra_splits = sorted(path.stem for path in source.glob("*.parquet")
+                          if path.stem not in ("train", "validation", "test"))
     datasets = {split: SoftTargetDataset(source / f"{split}.parquet", tokenizer, config.max_length)
-                for split in ("train", "validation", "test")}
+                for split in ("train", "validation", "test", *extra_splits)}
     model = AutoModelForSequenceClassification.from_pretrained(
         config.model_name, revision=config.revision, num_labels=len(LABELS) + len(ACTION_LABELS),
         id2label=dict(enumerate(LABELS + ACTION_LABELS)),
@@ -237,10 +251,41 @@ def train(
     train_result = trainer.train()
     validation = trainer.evaluate(metric_key_prefix="validation")
     test = trainer.evaluate(datasets["test"], metric_key_prefix="test")
+    extra = {split: trainer.evaluate(datasets[split], metric_key_prefix=split) for split in extra_splits}
     model_directory = destination / "model"
     trainer.save_model(str(model_directory))
     tokenizer.save_pretrained(model_directory)
     metrics = {"train": train_result.metrics, "validation": validation, "test": test,
-               "best_checkpoint": trainer.state.best_model_checkpoint}
+               **extra, "best_checkpoint": trainer.state.best_model_checkpoint}
     (destination / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
     return {"model_directory": model_directory, "metrics": metrics}
+
+
+def evaluate(
+    model_directory: str | Path,
+    split_paths: dict[str, str | Path],
+    *,
+    config: TrainingConfig | None = None,
+) -> dict[str, dict[str, float]]:
+    """Evaluate a trained model on prepared Parquet splits without training it.
+
+    Returns metrics keyed by split name, prefixed like a run's metrics.json.
+    config supplies max_length, eval_batch_size and precision; model_name is ignored.
+    """
+    config = config or TrainingConfig()
+    tokenizer = AutoTokenizer.from_pretrained(model_directory, use_fast=False)
+    model = AutoModelForSequenceClassification.from_pretrained(model_directory)
+    with TemporaryDirectory(prefix="deberta-evaluate-") as scratch:
+        trainer = SoftTargetTrainer(
+            model=model, processing_class=tokenizer,
+            args=TrainingArguments(
+                output_dir=scratch, per_device_eval_batch_size=config.eval_batch_size,
+                bf16=config.bf16, fp16=config.fp16, use_cpu=config.use_cpu, report_to="none",
+                label_names=["labels"], eval_accumulation_steps=16,
+            ),
+            data_collator=DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8),
+            compute_metrics=compute_metrics,
+        )
+        return {split: trainer.evaluate(SoftTargetDataset(path, tokenizer, config.max_length),
+                                        metric_key_prefix=split)
+                for split, path in split_paths.items()}
